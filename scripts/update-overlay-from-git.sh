@@ -32,6 +32,17 @@ git fetch --prune "${REMOTE_NAME}" "${CUSTOM_BRANCH}"
 remote_head="$(git rev-parse FETCH_HEAD)"
 if [[ "${current_head}" == "${remote_head}" ]]; then
   echo "Custom repo is already up to date"
+  if [[ "${FORCE_DEPLOY}" != "1" ]]; then
+    exit 0
+  fi
+
+  if [[ -z "${OFFICIAL_ROOT:-}" ]]; then
+    echo "OFFICIAL_ROOT is required when FORCE_DEPLOY=1"
+    exit 1
+  fi
+
+  echo "FORCE_DEPLOY=1, redeploy current overlay without git changes"
+  CUSTOM_ROOT="${CUSTOM_ROOT}" OFFICIAL_ROOT="${OFFICIAL_ROOT}" bash "${DEPLOY_SCRIPT}"
   exit 0
 fi
 

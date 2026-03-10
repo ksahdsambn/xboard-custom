@@ -244,3 +244,17 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
   - 直接接管 follower 容器的 `position / inset / transform / left / top`
   - 同时限制语言面板高度并保留内部滚动
   - 避免保留原始“向上弹出”的 transform 导致弹层继续跑出屏幕
+
+#### 6. 部署脚本问题定位与修复
+
+- 线上继续无变化后，进一步排查确认：
+  - GitHub 仓库中的 `theme/XboardCustom/assets/i18n-extra.js` 已经是第二版修复
+  - 但线上运行目录仍可能保留旧主题文件
+- 根因不是前端代码没写，而是 `scripts/update-overlay-from-git.sh` 存在部署逻辑缺陷：
+  - 当自定义仓库本地 `HEAD` 与远端 `HEAD` 相同的时候，脚本会直接退出
+  - 即使传入 `FORCE_DEPLOY=1`，也不会真正执行 `deploy-overlay.sh`
+  - 这会导致“仓库代码已是最新，但运行目录主题未被重新覆盖”时，重复执行更新任务仍然无效
+- 修复方式：
+  - 调整 `scripts/update-overlay-from-git.sh`
+  - 当仓库已是最新但 `FORCE_DEPLOY=1` 时，仍然强制执行一次 overlay 部署
+  - 用于修复这类“代码已拉取但运行目录未刷新”的状态漂移问题
