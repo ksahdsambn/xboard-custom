@@ -47,6 +47,16 @@
 
 不要把 `XboardCustom` 作为长期维护主题直接放进官方运行目录根下的 `theme/XboardCustom`。
 
+脚本职责分工如下：
+
+- `scripts/deploy-overlay.sh`
+  - 只负责把当前仓库里的插件和主题同步到官方运行目录
+  - 会重启 `web`、`horizon` 并刷新当前主题静态文件
+- `scripts/update-overlay-from-git.sh`
+  - 先执行 `git fetch` 和快进更新
+  - 只有当 `plugins/` 或 `theme/` 发生变化时，才会调用 `deploy-overlay.sh`
+  - 如果这次只是 `markdown/` 等非运行时代码变更，会自动跳过覆盖部署和服务重启
+
 ## 一、初次部署
 
 ### 第 1 步：在 1Panel 安装基础环境
@@ -256,12 +266,20 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 ```bash
 set -euo pipefail
-cd /opt/xboard-custom
-git pull --ff-only origin main
-OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
 ```
 
-如果你的远端默认分支不是 `main`，把 `origin main` 改成实际分支名。
+如果你需要显式指定自定义仓库分支，也可以写成：
+
+```bash
+set -euo pipefail
+CUSTOM_BRANCH=main OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
+```
+
+这条任务现在的行为是：
+
+- 如果这次 GitHub 更新只改了 `markdown/` 等文档文件：只更新仓库，不重启服务
+- 如果这次更新包含 `plugins/` 或 `theme/` 变更：自动执行覆盖同步、容器重启和主题刷新
 
 保存后，以后每次你更新了 GitHub 上的 `xboard-custom` 仓库，只需要：
 
@@ -317,12 +335,19 @@ docker compose pull
 docker compose run --rm -T web php artisan xboard:update
 docker compose up -d
 
-cd /opt/xboard-custom
-git pull --ff-only origin main
-OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
+FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
 ```
 
-如果你的 `xboard-custom` 默认分支不是 `main`，把 `origin main` 改成实际分支名。
+如果你的 `xboard-custom` 默认分支不是 `main`，可以改成：
+
+```bash
+FORCE_DEPLOY=1 CUSTOM_BRANCH=你的分支名 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
+```
+
+这里使用 `FORCE_DEPLOY=1` 的原因是：
+
+- 官方底座刚更新完，即使 `xboard-custom` 仓库本身没有新代码，也建议重新执行一次 overlay 同步和主题刷新
+- 这样可以保证插件目录、主题目录和发布后的静态资源都按当前官方底座重新落地
 
 ### 官方更新时的操作顺序
 
@@ -418,9 +443,7 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 ```bash
 set -euo pipefail
-cd /opt/xboard-custom
-git pull --ff-only origin main
-OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
 ```
 
 ### 后续更新官方仓库只需要执行的脚本
@@ -433,9 +456,7 @@ docker compose pull
 docker compose run --rm -T web php artisan xboard:update
 docker compose up -d
 
-cd /opt/xboard-custom
-git pull --ff-only origin main
-OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
+FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
 ```
 
 ## 七、最终结论
