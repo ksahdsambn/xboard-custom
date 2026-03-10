@@ -204,6 +204,19 @@
     };
   }
 
+  function isAuthPath(path) {
+    return path === "/login"
+      || path === "/register"
+      || path === "/forgot"
+      || path === "/forget"
+      || path.indexOf("/reset") === 0
+      || path.indexOf("/password") === 0;
+  }
+
+  function shouldShowDock() {
+    return state.authed === true && !isAuthPath(state.route.path);
+  }
+
   function badge(label, tone) {
     return '<div class="xc-wallet-badge"' + (tone ? ' data-tone="' + esc(tone) + '"' : "") + ">" + esc(label) + "</div>";
   }
@@ -392,7 +405,10 @@
   function render() {
     ensure();
     applyLocaleDirection(state.locale);
-    dom.dock.innerHTML = dockHtml();
+    var dockVisible = shouldShowDock();
+    dom.dock.hidden = !dockVisible;
+    dom.dock.dataset.visible = dockVisible ? "true" : "false";
+    dom.dock.innerHTML = dockVisible ? dockHtml() : "";
     dom.overlay.dataset.open = state.route.isWallet ? "true" : "false";
     dom.overlay.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
     dom.overlay.dataset.locale = intlLocale();
@@ -537,25 +553,31 @@
 
   async function load(force) {
     state.locale = detectLocale();
-    if (!state.route.isWallet && !force) return render();
     state.token = token();
     if (!state.token) {
       state.authed = false;
+      state.user = null;
       state.loading = false;
       return render();
     }
-    state.loading = true;
+    var shouldLoadWallet = state.route.isWallet || force;
+    state.loading = shouldLoadWallet;
     render();
     var rid = ++state.rid;
     var base = await safe(function () { return api("/api/v1/user/info"); });
     if (rid !== state.rid) return;
     if (!base.ok) {
       state.authed = false;
+      state.user = null;
       state.loading = false;
       return render();
     }
     state.authed = true;
     state.user = base.data;
+    if (!shouldLoadWallet) {
+      state.loading = false;
+      return render();
+    }
     var tradeNo = state.route.tradeNo || sessionStorage.getItem(LAST_TOPUP) || "";
     var all = await Promise.all([
       safe(function () { return api("/api/v1/user/getSubscribe"); }),
@@ -599,18 +621,16 @@
     var next = parseHash(location.hash);
     if (next.isWallet && !state.route.isWallet) remember();
     state.route = next;
-    if (state.route.isWallet) return load(false);
-    render();
+    load(false);
   }
 
   function init() {
     ensure();
-    render();
+    load(false);
     addEventListener("hashchange", sync);
     addEventListener("keydown", function (event) {
       if (event.key === "Escape" && state.route.isWallet) closeWallet();
     });
-    if (state.route.isWallet) load(false);
   }
 
   if (document.readyState === "loading") {

@@ -4512,9 +4512,23 @@
       return null;
     }
   }
+  function readCurrentHashPath() {
+    var raw = String(window.location.hash || '').replace(/^#/, '');
+    var path = raw.split('?')[0] || '/';
+    if (path.charAt(0) !== '/') path = '/' + path;
+    return path;
+  }
+  function isAuthPath(path) {
+    return path === '/login'
+      || path === '/register'
+      || path === '/forgot'
+      || path === '/forget'
+      || path.indexOf('/reset') === 0
+      || path.indexOf('/password') === 0;
+  }
   function applyLocaleDirection(locale) {
     var value = locale || 'zh-CN';
-    var rtl = (payload.rtlLocales || []).indexOf(value) !== -1;
+    var rtl = (payload.rtlLocales || []).indexOf(value) !== -1 && !isAuthPath(readCurrentHashPath());
     document.documentElement.lang = value;
     document.documentElement.dir = rtl ? 'rtl' : 'ltr';
     if (document.body) {
@@ -4530,5 +4544,8 @@
     if (event.key === 'VUE_NAIVE_LOCALE') {
       applyLocaleDirection(readStoredLocale() || 'zh-CN');
     }
+  });
+  window.addEventListener('hashchange', function () {
+    applyLocaleDirection(readStoredLocale() || document.documentElement.lang || navigator.language || 'zh-CN');
   });
 })();

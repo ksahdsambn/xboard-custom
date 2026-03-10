@@ -139,3 +139,34 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
   - `scripts/` 下部署脚本或发布脚本调整
   - 1Panel 计划任务、部署路径、容器服务名变化
   - 与部署、升级、回滚相关的重要文档修订
+
+### 2026-03-10 登录页语言与钱包浮层修复
+
+#### 1. 登录页 RTL 语言切换异常修复
+
+- 修复 `theme/XboardCustom/assets/i18n-extra.js`
+- 问题现象：
+  - 当登录页切换到 `ar-SA` 这类 RTL 语言后，登录卡片底部的语言切换入口会从右下角翻到左下角
+  - 该状态下语言切换入口易出现无法继续点击的问题
+- 修复方式：
+  - 新增当前 hash 路径识别
+  - 在 `#/login`、`#/register`、`#/forgot`、`#/forget`、`#/reset*`、`#/password*` 这类认证页面上，禁止把整页全局方向切换为 `rtl`
+  - 仅在非认证页面保留全局 RTL 翻转
+  - 新增 `hashchange` 监听，在登录页与已登录页面之间切换时重新应用方向设置
+
+#### 2. 钱包浮层改为仅登录后可见
+
+- 修复 `theme/XboardCustom/assets/wallet-center.js`
+- 问题现象：
+  - 登录页右下角会出现 WalletCenter 钱包浮层入口
+  - 这与“登录前不显示钱包入口、登录后才显示”的预期不一致
+- 修复方式：
+  - 新增认证页面路径识别
+  - 钱包浮层入口改为只有在“已确认登录态”且“当前不在认证页面”时才显示
+  - 初始化和 hash 路由切换时，都会重新执行登录态确认，避免登录成功后入口不刷新或退出后入口残留
+
+#### 3. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `theme/XboardCustom/assets/wallet-center.js`
+- `markdown/Memory-updates-each-time.md`
