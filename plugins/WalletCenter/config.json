@@ -1,0 +1,67 @@
+{
+    "name": "WalletCenter",
+    "code": "wallet_center",
+    "version": "0.1.0",
+    "description": "WalletCenter plugin skeleton for checkin, topup, and balance auto renew.",
+    "author": "Codex",
+    "type": "feature",
+    "require": {
+        "xboard": ">=1.0.0"
+    },
+    "config": {
+        "display_name": {
+            "type": "string",
+            "default": "WalletCenter",
+            "label": "显示名称",
+            "description": "WalletCenter 在后台与后续前台主题中的统一显示名称。"
+        },
+        "checkin_enabled": {
+            "type": "boolean",
+            "default": false,
+            "label": "启用签到骨架",
+            "description": "控制每日签到 API 与记录入口是否对外开放。阶段 6 完成后再正式启用。"
+        },
+        "checkin_reward_min": {
+            "type": "string",
+            "default": "100",
+            "label": "签到奖励最小值（分）",
+            "description": "阶段 6 将使用该值作为签到随机奖励下限。"
+        },
+        "checkin_reward_max": {
+            "type": "string",
+            "default": "500",
+            "label": "签到奖励最大值（分）",
+            "description": "阶段 6 将使用该值作为签到随机奖励上限。"
+        },
+        "topup_enabled": {
+            "type": "boolean",
+            "default": false,
+            "label": "启用充值骨架",
+            "description": "控制余额充值 API、充值记录入口与充值通知路由是否开放。阶段 7 完成后再正式启用。"
+        },
+        "topup_min_amount": {
+            "type": "string",
+            "default": "100",
+            "label": "充值最小金额（分）",
+            "description": "阶段 7 将使用该值作为充值金额下限。"
+        },
+        "topup_max_amount": {
+            "type": "string",
+            "default": "500000",
+            "label": "充值最大金额（分）",
+            "description": "阶段 7 将使用该值作为充值金额上限。"
+        },
+        "auto_renew_enabled": {
+            "type": "boolean",
+            "default": false,
+            "label": "启用自动续费骨架",
+            "description": "控制自动续费 API、记录入口与扫描命令是否开放。阶段 8 和阶段 9 完成后再正式启用。"
+        },
+        "auto_renew_window_hours": {
+            "type": "string",
+            "default": "24",
+            "label": "续费提前小时数",
+            "description": "阶段 8 将使用该值决定到期前多久尝试自动续费。"
+        }
+    }
+}

@@ -1,0 +1,8 @@
+{
+    "name": "BEpusdtPayment",
+    "code": "bepusdt_payment",
+    "type": "payment",
+    "version": "0.1.0",
+    "description": "BEpusdt one-time payment plugin for standard subscription orders",
+    "author": "Codex"
+}
