@@ -26,8 +26,14 @@
 
 服务器建议固定使用两个目录：
 
-- 官方运行目录：`/opt/1panel/apps/openresty/openresty/www/sites/xboard/index`
+- 官方运行目录：`/opt/1panel/www/sites/xboard/index`
 - 自定义仓库目录：`/opt/xboard-custom`
+
+你当前这台 1Panel 服务器的实际站点目录就是反向代理网站 `xboard` 对应的：
+
+- `/opt/1panel/www/sites/xboard/index`
+
+判断方法也很简单：哪个目录同时包含 `compose.yaml`、`.env`、`plugins/`、`storage/`，哪个目录就是 Xboard 的实际运行根目录。
 
 在 1Panel 官方 `compose` 结构下，下面两个目录是自定义层的关键挂载点：
 
@@ -80,7 +86,7 @@
 4. 执行：
 
 ```bash
-cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
+cd /opt/1panel/www/sites/xboard/index
 git clone -b compose --depth 1 https://github.com/cedar2025/Xboard ./
 ```
 
@@ -100,7 +106,7 @@ yum update -y && yum install -y git rsync
 
 在 1Panel 中打开 `文件`，进入站点目录：
 
-- `/opt/1panel/apps/openresty/openresty/www/sites/xboard/index`
+- `/opt/1panel/www/sites/xboard/index`
 
 打开 `compose.yaml`，确认至少包含以下挂载关系：
 
@@ -116,7 +122,7 @@ yum update -y && yum install -y git rsync
 在 1Panel `终端` 执行：
 
 ```bash
-cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
+cd /opt/1panel/www/sites/xboard/index
 docker compose run -it --rm web php artisan xboard:install
 docker compose up -d
 ```
@@ -156,7 +162,7 @@ git clone https://github.com/ksahdsambn/xboard-custom.git /opt/xboard-custom
 在 1Panel `终端` 执行：
 
 ```bash
-OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash /opt/xboard-custom/scripts/deploy-overlay.sh
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/deploy-overlay.sh
 ```
 
 这条命令会自动做以下事情：
@@ -236,13 +242,26 @@ OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash /
 3. 新建脚本任务
 4. 名称建议：`xboard-custom-sync`
 
+建议表单这样填写：
+
+- 任务类型：`Shell 脚本`
+- 任务名称：`xboard-custom-sync`
+- 分组：`默认`
+- 执行周期：任意低频值即可，例如 `每月 / 1 日 / 04:30`
+- `在容器中执行`：不要勾选
+- 用户：`root`
+- 解释器：勾选 `自定义`，填写 `/bin/bash`
+
 脚本内容：
 
 ```bash
+set -euo pipefail
 cd /opt/xboard-custom
-git pull
-OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash scripts/deploy-overlay.sh
+git pull --ff-only origin main
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
 ```
+
+如果你的远端默认分支不是 `main`，把 `origin main` 改成实际分支名。
 
 保存后，以后每次你更新了 GitHub 上的 `xboard-custom` 仓库，只需要：
 
@@ -278,19 +297,32 @@ OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash s
 3. 新建脚本任务
 4. 名称建议：`xboard-official-update`
 
+建议表单这样填写：
+
+- 任务类型：`Shell 脚本`
+- 任务名称：`xboard-official-update`
+- 分组：`默认`
+- 执行周期：任意低频值即可，例如 `每月 / 1 日 / 05:00`
+- `在容器中执行`：不要勾选
+- 用户：`root`
+- 解释器：勾选 `自定义`，填写 `/bin/bash`
+
 脚本内容：
 
 ```bash
-cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
+set -euo pipefail
+cd /opt/1panel/www/sites/xboard/index
 git pull --ff-only origin compose
 docker compose pull
 docker compose run --rm -T web php artisan xboard:update
 docker compose up -d
 
 cd /opt/xboard-custom
-git pull
-OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash scripts/deploy-overlay.sh
+git pull --ff-only origin main
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
 ```
+
+如果你的 `xboard-custom` 默认分支不是 `main`，把 `origin main` 改成实际分支名。
 
 ### 官方更新时的操作顺序
 
@@ -373,35 +405,37 @@ docker compose run --rm -T xboard php artisan xboard:update
 ### 初次部署只需要的关键命令
 
 ```bash
-cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
+cd /opt/1panel/www/sites/xboard/index
 git clone -b compose --depth 1 https://github.com/cedar2025/Xboard ./
 docker compose run -it --rm web php artisan xboard:install
 docker compose up -d
 
 git clone https://github.com/ksahdsambn/xboard-custom.git /opt/xboard-custom
-OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash /opt/xboard-custom/scripts/deploy-overlay.sh
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/deploy-overlay.sh
 ```
 
 ### 后续更新自定义层只需要执行的脚本
 
 ```bash
+set -euo pipefail
 cd /opt/xboard-custom
-git pull
-OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash scripts/deploy-overlay.sh
+git pull --ff-only origin main
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
 ```
 
 ### 后续更新官方仓库只需要执行的脚本
 
 ```bash
-cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
+set -euo pipefail
+cd /opt/1panel/www/sites/xboard/index
 git pull --ff-only origin compose
 docker compose pull
 docker compose run --rm -T web php artisan xboard:update
 docker compose up -d
 
 cd /opt/xboard-custom
-git pull
-OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash scripts/deploy-overlay.sh
+git pull --ff-only origin main
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash scripts/deploy-overlay.sh
 ```
 
 ## 七、最终结论
