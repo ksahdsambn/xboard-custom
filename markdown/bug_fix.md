@@ -47,3 +47,41 @@
 - 容器内 `php -l` 复核 33 个目标 PHP 文件，全部通过。
 - 4 个 `config.json` 文件均可成功解析。
 - `theme/XboardCustom/assets/wallet-center.js`、`i18n-extra.js`、`umi.js` 均通过 `node --check`。
+
+## 2026-03-10 仓库级回归复核
+
+### 4. 1Panel overlay 主题同步目标错误且可能被旧根主题覆盖
+
+- 涉及文件：
+  - `scripts/deploy-overlay.sh`
+- 问题描述：
+  - 初版同步脚本将 `XboardCustom` 直接同步到官方运行目录根下的 `theme/XboardCustom`，但当前 1Panel 官方 `compose` 方案长期挂载的是 `storage/theme`，主题的可持久化目录应当是 `storage/theme/XboardCustom`。
+  - 如果服务器上还残留旧的 `theme/XboardCustom`，`ThemeService` 会优先读取根目录主题，导致刚同步到 `storage/theme` 的新主题实际上不生效。
+- 修复方案：
+  - 将同步目标改为 `storage/theme/XboardCustom`。
+  - 在同步后主动清理残留的 `theme/XboardCustom`，避免主题优先级冲突。
+- 修复结果：
+  - 当前 overlay 部署流程已与 1Panel 官方挂载结构保持一致，且不会再因为旧根主题目录残留而覆盖掉新的自定义主题。
+
+### 5. umi.js 压缩副本与源码不一致
+
+- 涉及文件：
+  - `theme/XboardCustom/assets/umi.js`
+  - `theme/XboardCustom/assets/umi.js.gz`
+  - `theme/XboardCustom/assets/umi.js.br`
+- 问题描述：
+  - `umi.js` 曾被修改过，但仓库中的 `.gz` 和 `.br` 压缩副本没有同步重建。
+  - 生产环境若优先返回压缩副本，浏览器可能实际加载旧代码，导致“源码已修复但线上仍执行旧逻辑”的发布错误。
+- 修复方案：
+  - 基于当前 `umi.js` 重新生成 `umi.js.gz` 和 `umi.js.br`。
+  - 追加一致性校验，确认两份压缩副本解压后的内容与 `umi.js` 完全一致。
+- 修复结果：
+  - 当前主题静态资源的源码和压缩发布副本已经一致，不会再因压缩文件滞后导致前端加载旧版本代码。
+
+## 本轮回归验证
+
+- 容器内 `php -l` 再次复核 33 个 PHP 文件，全部通过。
+- 4 个 `config.json` 文件再次解析通过。
+- `theme/XboardCustom/assets/wallet-center.js`、`i18n-extra.js`、`umi.js` 再次通过 `node --check`。
+- `scripts/deploy-overlay.sh` 通过真实 Bash 语法检查。
+- `theme/XboardCustom/assets/umi.js.gz` 与 `theme/XboardCustom/assets/umi.js.br` 已确认和 `umi.js` 内容一致。

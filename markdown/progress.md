@@ -531,3 +531,47 @@
 - 当前执行阶段：阶段 16 后置专项复核
 - 当前阶段结果：已完成新增文件专项审查，确认修复 2 项后端问题并补齐审计记录
 - 下一阶段：无（如需继续推进，仅建议补充真实支付网关联调回归）
+
+## 2026-03-10 仓库级回归复核补充
+
+### 本轮复核范围
+
+- 基于当前 `xboard-custom` 仓库重新复核可执行代码、部署脚本与主题发布副本。
+- 重点检查 1Panel overlay 部署路径、主题加载优先级以及 `umi.js` 与压缩静态副本的一致性。
+
+### 本轮修复
+
+- `scripts/deploy-overlay.sh`
+  - 将主题同步目标固定为 1Panel `compose` 挂载目录 `storage/theme/XboardCustom`，避免继续写入非持久化主路径。
+  - 增加对遗留 `theme/XboardCustom` 根目录的清理逻辑，避免 `ThemeService` 优先读取旧根主题，导致新同步的 `storage/theme/XboardCustom` 实际不生效。
+- `theme/XboardCustom/assets/umi.js.gz`
+  - 基于当前 `theme/XboardCustom/assets/umi.js` 重新生成 gzip 压缩副本，消除压缩资源滞后风险。
+- `theme/XboardCustom/assets/umi.js.br`
+  - 基于当前 `theme/XboardCustom/assets/umi.js` 重新生成 brotli 压缩副本，确保压缩发布产物与源码一致。
+
+### 本轮验证结果
+
+- PHP 语法回归：
+  - 使用容器镜像 `ghcr.io/cedar2025/xboard:new` 对仓库内 33 个 PHP 文件执行 `php -l`，全部通过。
+- JSON 结构回归：
+  - 4 个 `config.json` 文件均再次解析通过。
+- 前端脚本回归：
+  - `theme/XboardCustom/assets/wallet-center.js` 通过 `node --check`
+  - `theme/XboardCustom/assets/i18n-extra.js` 通过 `node --check`
+  - `theme/XboardCustom/assets/umi.js` 通过 `node --check`
+- 发布资产一致性回归：
+  - `theme/XboardCustom/assets/umi.js.gz` 已确认与 `umi.js` 内容一致
+  - `theme/XboardCustom/assets/umi.js.br` 已确认与 `umi.js` 内容一致
+- 部署脚本回归：
+  - `scripts/deploy-overlay.sh` 已通过真实 Bash 语法检查
+
+### 本轮结论
+
+- 当前 `xboard-custom` 仓库新增确认并修复 2 项发布层问题：主题同步目标错误且可能被旧根主题覆盖、`umi.js` 压缩副本滞后于源码。
+- 修复后，仓库的插件代码、主题源码、主题压缩副本与 1Panel overlay 部署脚本在静态层面已保持一致，可作为当前可交付版本继续维护。
+
+## 当前状态补充（2026-03-10 仓库级回归）
+
+- 当前执行阶段：阶段 16 后置仓库回归复核
+- 当前阶段结果：已完成仓库级回归审查并修复 2 项发布层问题
+- 下一阶段：无（如需继续推进，建议补充 1Panel 真实部署回归）

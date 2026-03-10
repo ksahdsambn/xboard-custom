@@ -73,6 +73,22 @@ restart_service_if_exists() {
   fi
 }
 
+cleanup_legacy_theme_path() {
+  local legacy_theme_path="${OFFICIAL_ROOT}/theme/${THEME_NAME}"
+
+  if [[ ! -d "${legacy_theme_path}" ]]; then
+    return 0
+  fi
+
+  if [[ "${DRY_RUN}" == "1" ]]; then
+    echo "Dry run: remove legacy theme path ${legacy_theme_path}"
+    return 0
+  fi
+
+  echo "Remove legacy theme path to avoid theme precedence conflict: ${legacy_theme_path}"
+  rm -rf "${legacy_theme_path}"
+}
+
 refresh_theme_if_possible() {
   if [[ "${DRY_RUN}" == "1" ]]; then
     echo "Dry run enabled, skip theme refresh"
@@ -95,6 +111,7 @@ sync_dir "${CUSTOM_ROOT}/plugins/StripePayment" "${OFFICIAL_ROOT}/plugins/Stripe
 sync_dir "${CUSTOM_ROOT}/plugins/BepusdtPayment" "${OFFICIAL_ROOT}/plugins/BepusdtPayment"
 sync_dir "${CUSTOM_ROOT}/plugins/WalletCenter" "${OFFICIAL_ROOT}/plugins/WalletCenter"
 sync_dir "${CUSTOM_ROOT}/theme/${THEME_NAME}" "${OFFICIAL_ROOT}/${THEME_TARGET_ROOT}/${THEME_NAME}"
+cleanup_legacy_theme_path
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "Dry run completed"

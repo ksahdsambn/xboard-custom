@@ -234,3 +234,20 @@
 
 - 本轮新增文件专项复核发现的确定性问题集中在 `WalletCenter` 充值链路，而非 `StripePayment`、`BepusdtPayment` 或主题注入层的结构设计。
 - 修复后，`WalletCenter` 充值链路的关键边界已补强为：“支付成功入账优先”“终态不被后续非成功回调覆盖”“支付回跳地址不再接受任意外部来源”。
+
+## 2026-03-10 仓库级回归复核补充
+
+### 职责修正
+
+- 2026-03-10 回归 | `scripts/deploy-overlay.sh` | `xboard-custom` | overlay 部署脚本职责修正为“同步插件到 `plugins/`、同步主题到 `storage/theme/`、清理遗留根主题目录、重启 compose 服务并刷新当前主题静态文件”，从而与 1Panel 官方 `compose` 挂载结构保持一致。
+- 2026-03-10 回归 | `theme/XboardCustom/assets/umi.js.gz` | `XboardCustom` | gzip 压缩副本职责修正为当前 `umi.js` 的发布镜像，不再允许滞后于源码。
+- 2026-03-10 回归 | `theme/XboardCustom/assets/umi.js.br` | `XboardCustom` | brotli 压缩副本职责修正为当前 `umi.js` 的发布镜像，不再允许滞后于源码。
+
+### 文件洞察补充
+
+- `scripts/deploy-overlay.sh` 是当前 `xboard-custom` 仓库面向 1Panel 生产环境的唯一主部署入口，职责不再只是“目录同步”，还承担“消除旧主题优先级干扰”的收尾动作。
+- `theme/XboardCustom/assets/umi.js`、`umi.js.gz`、`umi.js.br` 现在应视为一个逻辑整体维护；只改 `umi.js` 而不重建两份压缩副本，会直接形成生产资源版本分裂。
+
+### 本轮结论
+
+- 本轮仓库级回归确认：除插件/主题源码本身外，发布脚本与压缩静态资源也是可导致线上行为偏差的第一类资产，后续维护中必须与源码一起审查和回归。
