@@ -75,23 +75,25 @@
 这一步需要少量命令行，但只做一次。
 
 1. 在 1Panel 中打开 `终端`。
-2. 执行：
+2. 先确认站点目录是空目录。
+3. 如果 `index` 目录里已经有默认文件，先在 1Panel `文件` 页面手动清空这个目录，再继续。
+4. 执行：
 
 ```bash
 cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
 git clone -b compose --depth 1 https://github.com/cedar2025/Xboard ./
 ```
 
-如果系统没有 `git`，先安装：
+如果系统没有 `git` 和 `rsync`，先安装：
 
 ```bash
-apt update && apt install -y git
+apt update && apt install -y git rsync
 ```
 
 CentOS/RHEL 可改为：
 
 ```bash
-yum update -y && yum install -y git
+yum update -y && yum install -y git rsync
 ```
 
 ### 第 4 步：确认 compose 挂载是否正确
@@ -163,6 +165,7 @@ OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash /
 - 同步 `BepusdtPayment` 到官方运行目录 `plugins/BepusdtPayment`
 - 同步 `WalletCenter` 到官方运行目录 `plugins/WalletCenter`
 - 同步 `XboardCustom` 到官方运行目录 `storage/theme/XboardCustom`
+- 如果服务器残留了旧的 `theme/XboardCustom`，脚本会自动清理，避免主题优先级冲突
 - 重启 `web` 和 `horizon`
 - 刷新当前主题静态文件
 
@@ -279,6 +282,7 @@ OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash s
 
 ```bash
 cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
+git pull --ff-only origin compose
 docker compose pull
 docker compose run --rm -T web php artisan xboard:update
 docker compose up -d
@@ -297,6 +301,18 @@ OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash s
 3. 执行 `xboard-official-update`
 4. 等脚本执行完成
 5. 回后台检查系统状态
+
+如果脚本里这一步失败：
+
+```bash
+docker compose run --rm -T web php artisan xboard:update
+```
+
+说明你的旧安装仍在使用旧服务名。把脚本任务中的 `web` 改成 `xboard` 后再执行一次：
+
+```bash
+docker compose run --rm -T xboard php artisan xboard:update
+```
 
 ### 官方更新后必须检查的内容
 
@@ -378,6 +394,7 @@ OFFICIAL_ROOT=/opt/1panel/apps/openresty/openresty/www/sites/xboard/index bash s
 
 ```bash
 cd /opt/1panel/apps/openresty/openresty/www/sites/xboard/index
+git pull --ff-only origin compose
 docker compose pull
 docker compose run --rm -T web php artisan xboard:update
 docker compose up -d
