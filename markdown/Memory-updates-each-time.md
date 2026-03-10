@@ -205,3 +205,33 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
 
 - `theme/XboardCustom/dashboard.blade.php`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 登录页语言选择框视口适配修复
+
+#### 1. 问题现象
+
+- 登录页底部语言切换按钮展开后的语言列表始终向按钮上方弹出。
+- 在 PC Web 和移动 Web 上，语言列表高度过高时会超出屏幕顶部。
+- 超出屏幕的语言无法看到，也无法正常点击选择。
+
+#### 2. 修复方式
+
+- 修复 `theme/XboardCustom/assets/i18n-extra.js`
+- 新增认证页专用的语言弹层补丁，不改动编译后的 `umi.js`。
+- 在 `#/login`、`#/register`、`#/forgot`、`#/forget`、`#/reset*`、`#/password*` 页面上：
+  - 识别语言下拉面板对应的 `n-dropdown-menu`
+  - 为语言面板追加最大高度限制
+  - 让超长语言列表在面板内部滚动，而不是继续向屏幕外溢出
+  - 在桌面端和移动端都把弹层位置重新约束到可视区域内
+  - 在窗口尺寸变化、路由切换、语言面板重新挂载时自动重新计算位置
+
+#### 3. 预期结果
+
+- 用户点击登录页语言按钮后，可以在当前屏幕内看到完整可滚动的语言列表。
+- 无论默认语言是什么，弹出的语言面板都不会再因为超出屏幕而导致部分语言不可选。
+- 修复仅作用于认证页语言面板，不影响站内其他下拉组件。
+
+#### 4. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
