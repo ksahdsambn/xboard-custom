@@ -4502,8 +4502,8 @@
                              }
                }
 };
-  var AUTH_LOCALE_MENU_CLASS = 'xc-auth-locale-dropdown';
-  var AUTH_LOCALE_PANEL_CLASS = 'xc-auth-locale-panel';
+  var AUTH_LOCALE_MENU_CLASS = 'xc-auth-locale-menu';
+  var AUTH_LOCALE_VIEW_CLASS = 'xc-auth-locale-menu-view';
   var AUTH_LOCALE_FOLLOWER_CLASS = 'xc-auth-locale-follower';
   var AUTH_PAGE_CLASS = 'xc-auth-page';
   var authLocaleLayoutFrame = 0;
@@ -4564,21 +4564,29 @@
     style.id = 'xc-auth-locale-style';
     style.textContent = ''
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_FOLLOWER_CLASS + '{z-index:3200;}'
-      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_PANEL_CLASS + '{overflow:hidden;}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_MENU_CLASS + '{'
       + 'max-height:min(70vh,calc(100vh - 24px));'
+      + 'overflow:hidden;'
+      + '}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + '{'
+      + 'max-height:inherit;'
       + 'overflow-y:auto;'
       + 'overscroll-behavior:contain;'
       + '-webkit-overflow-scrolling:touch;'
       + '}'
-      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_MENU_CLASS + ' .n-scrollbar-container,'
-      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_MENU_CLASS + ' .n-scrollbar-content{'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + ' .n-scrollbar-container,'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + ' .n-scrollbar-content{'
       + 'max-height:inherit;'
+      + 'overflow-y:auto;'
       + '}';
     document.head.appendChild(style);
   }
   function isLocaleDropdown(menu) {
-    if (!menu || !menu.classList || !menu.classList.contains('n-dropdown-menu')) return false;
+    if (!menu || !menu.classList) return false;
+    var isSupported = menu.classList.contains('n-dropdown-menu')
+      || menu.classList.contains('n-base-select-menu')
+      || menu.classList.contains('n-popselect-menu');
+    if (!isSupported) return false;
     var text = String(menu.textContent || '');
     if (!text) return false;
     var hits = 0;
@@ -4588,33 +4596,53 @@
     return hits >= 4;
   }
   function getLocaleFollower(menu) {
-    return menu.closest('.v-binder-follower-container')
+    return menu.closest('.v-binder-follower-content')
+      || menu.closest('.v-binder-follower-container')
       || menu.closest('.n-popover')
       || menu.parentElement
       || menu;
   }
   function getLocalePanel(menu) {
-    return menu.closest('.n-dropdown')
+    if (menu.classList && (menu.classList.contains('n-base-select-menu') || menu.classList.contains('n-dropdown-menu'))) {
+      return menu;
+    }
+    return menu.closest('.n-base-select-menu')
+      || menu.closest('.n-dropdown-menu')
+      || menu.closest('.n-dropdown')
       || menu.closest('.n-popover')
       || menu.parentElement
       || menu;
+  }
+  function getLocaleMenuView(menu) {
+    return menu.querySelector('.n-base-select-menu-option-wrapper')
+      || menu.querySelector('.n-scrollbar-container')
+      || menu.querySelector('.n-scrollbar-content')
+      || menu;
+  }
+  function getAuthLocaleTrigger() {
+    var buttons = Array.prototype.filter.call(document.querySelectorAll('button.n-button--default-type'), function (button) {
+      var rect = button.getBoundingClientRect();
+      return rect.width > 20 && rect.height > 20 && rect.bottom > 0 && rect.right > 0;
+    });
+    if (!buttons.length) return null;
+    buttons.sort(function (a, b) {
+      return b.getBoundingClientRect().top - a.getBoundingClientRect().top;
+    });
+    return buttons[0];
   }
   function clearAuthLocaleLayout() {
     if (!document.body) return;
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_MENU_CLASS), function (menu) {
       menu.classList.remove(AUTH_LOCALE_MENU_CLASS);
       menu.style.maxHeight = '';
-      menu.style.overflowY = '';
-      menu.style.overscrollBehavior = '';
+      menu.style.overflow = '';
       menu.style.width = '';
     });
-    Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_PANEL_CLASS), function (panel) {
-      panel.classList.remove(AUTH_LOCALE_PANEL_CLASS);
-      panel.style.width = '';
-      panel.style.maxWidth = '';
-      panel.style.maxHeight = '';
-      panel.style.overflow = '';
-      panel.style.transform = '';
+    Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_VIEW_CLASS), function (view) {
+      view.classList.remove(AUTH_LOCALE_VIEW_CLASS);
+      view.style.maxHeight = '';
+      view.style.overflowY = '';
+      view.style.overscrollBehavior = '';
     });
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_FOLLOWER_CLASS), function (follower) {
       follower.classList.remove(AUTH_LOCALE_FOLLOWER_CLASS);
@@ -4636,13 +4664,15 @@
     if (!document.body || !document.body.classList.contains(AUTH_PAGE_CLASS) || !menu.isConnected) return;
     var follower = getLocaleFollower(menu);
     var panel = getLocalePanel(menu);
-    if (!follower || !panel) return;
+    var menuView = getLocaleMenuView(panel);
+    var trigger = getAuthLocaleTrigger();
+    if (!follower || !panel || !menuView) return;
     var margin = window.innerWidth <= 720 ? 12 : 16;
     var maxHeight = Math.max(240, Math.min(window.innerHeight - margin * 2, Math.round(window.innerHeight * 0.72)));
     var maxWidth = Math.max(220, Math.min(320, window.innerWidth - margin * 2));
 
     menu.classList.add(AUTH_LOCALE_MENU_CLASS);
-    panel.classList.add(AUTH_LOCALE_PANEL_CLASS);
+    menuView.classList.add(AUTH_LOCALE_VIEW_CLASS);
     follower.classList.add(AUTH_LOCALE_FOLLOWER_CLASS);
     follower.style.position = 'fixed';
     follower.style.right = 'auto';
@@ -4657,38 +4687,35 @@
     panel.style.maxHeight = maxHeight + 'px';
     panel.style.overflow = 'hidden';
     panel.style.transform = 'none';
-    menu.style.maxHeight = maxHeight + 'px';
-    menu.style.overflowY = 'auto';
-    menu.style.overscrollBehavior = 'contain';
+    panel.style.width = '';
     menu.style.width = '100%';
+    menuView.style.maxHeight = maxHeight + 'px';
+    menuView.style.overflowY = 'auto';
+    menuView.style.overscrollBehavior = 'contain';
 
     requestAnimationFrame(function () {
       if (!menu.isConnected) return;
       var followerRect = follower.getBoundingClientRect();
       var panelRect = panel.getBoundingClientRect();
       var width = Math.min(panelRect.width || followerRect.width || maxWidth, maxWidth);
-      var height = Math.min(panelRect.height || followerRect.height || maxHeight, maxHeight);
+      var height = Math.min(Math.max(menuView.scrollHeight || 0, panelRect.height || followerRect.height || 0), maxHeight);
       if (!width) width = maxWidth;
       if (!height) height = maxHeight;
-      var left = clamp(followerRect.left, margin, window.innerWidth - width - margin);
-      var top = clamp(followerRect.top, margin, window.innerHeight - height - margin);
+      var triggerRect = trigger ? trigger.getBoundingClientRect() : followerRect;
+      var left = clamp(triggerRect.right - width, margin, window.innerWidth - width - margin);
+      var top = clamp(triggerRect.top - height - 8, margin, window.innerHeight - height - margin);
 
       if (window.innerWidth <= 720) {
         width = Math.min(window.innerWidth - margin * 2, Math.max(width, 240));
         left = clamp(window.innerWidth - width - margin, margin, window.innerWidth - width - margin);
-        panel.style.width = width + 'px';
-        follower.style.width = width + 'px';
-        followerRect = follower.getBoundingClientRect();
-        panelRect = panel.getBoundingClientRect();
-        height = Math.min(panelRect.height || maxHeight, maxHeight);
-        top = clamp(followerRect.top, margin, window.innerHeight - height - margin);
+        top = clamp(triggerRect.top - height - 8, margin, window.innerHeight - height - margin);
       }
 
-      if (window.innerWidth > 720) {
-        panel.style.width = width + 'px';
-        follower.style.width = width + 'px';
-      }
-
+      panel.style.width = width + 'px';
+      follower.style.width = width + 'px';
+      follower.style.maxHeight = height + 'px';
+      panel.style.maxHeight = height + 'px';
+      menuView.style.maxHeight = height + 'px';
       follower.style.left = Math.round(left) + 'px';
       follower.style.top = Math.round(top) + 'px';
     });
@@ -4701,7 +4728,13 @@
       return;
     }
     ensureAuthLocaleStyles();
-    Array.prototype.forEach.call(document.querySelectorAll('.v-binder-follower-container .n-dropdown-menu, .n-popover .n-dropdown-menu'), function (menu) {
+    Array.prototype.forEach.call(document.querySelectorAll(
+      '.v-binder-follower-content .n-base-select-menu, '
+      + '.v-binder-follower-container .n-base-select-menu, '
+      + '.v-binder-follower-content .n-dropdown-menu, '
+      + '.v-binder-follower-container .n-dropdown-menu, '
+      + '.n-popover .n-dropdown-menu'
+    ), function (menu) {
       if (isLocaleDropdown(menu)) {
         fitAuthLocaleDropdown(menu);
       }

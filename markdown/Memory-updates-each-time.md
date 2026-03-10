@@ -258,3 +258,19 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
   - 调整 `scripts/update-overlay-from-git.sh`
   - 当仓库已是最新但 `FORCE_DEPLOY=1` 时，仍然强制执行一次 overlay 部署
   - 用于修复这类“代码已拉取但运行目录未刷新”的状态漂移问题
+
+#### 7. 真实弹层结构复核与第三次修正
+
+- 使用无头 Edge 直接连接线上登录页后，确认语言选择器的真实结构不是 `n-dropdown-menu / n-popover` 主链路，而是：
+  - `v-binder-follower-content`
+  - `n-base-select-menu`
+  - `n-base-select-menu-option-wrapper`
+- 线上可见的溢出根因是：
+  - `v-binder-follower-content` 使用 `transform: matrix(..., ..., ..., ..., x, y)` 把菜单整体移动到了视口上方
+  - `n-base-select-menu` 本身没有高度限制，也没有内部滚动
+- 因此第三次修正改为：
+  - 直接匹配 `n-base-select-menu`
+  - 直接接管 `v-binder-follower-content`
+  - 用底部语言按钮的实际位置重新计算 `left / top`
+  - 给 `n-base-select-menu-option-wrapper` 注入 `max-height + overflow-y:auto`
+  - 让语言列表在菜单内部滚动，而不是继续整体溢出屏幕
