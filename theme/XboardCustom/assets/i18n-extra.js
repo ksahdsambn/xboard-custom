@@ -4508,6 +4508,7 @@
   var AUTH_PAGE_CLASS = 'xc-auth-page';
   var authLocaleLayoutFrame = 0;
   var authLocaleObserver = null;
+  var authLocaleScrollbarWidth = 0;
   var knownLocaleLabels = buildKnownLocaleLabels();
 
   function buildKnownLocaleLabels() {
@@ -4554,6 +4555,34 @@
   function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
   }
+  function getAuthLocaleScrollbarWidth() {
+    if (authLocaleScrollbarWidth > 0) return authLocaleScrollbarWidth;
+    if (!document.body) return 12;
+    var probe = document.createElement('div');
+    probe.style.position = 'absolute';
+    probe.style.top = '-9999px';
+    probe.style.width = '120px';
+    probe.style.height = '120px';
+    probe.style.overflow = 'scroll';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    authLocaleScrollbarWidth = probe.offsetWidth - probe.clientWidth;
+    document.body.removeChild(probe);
+    return authLocaleScrollbarWidth || 12;
+  }
+  function getAuthLocaleOptionContentWidth(menu) {
+    if (!menu) return 0;
+    var widest = 0;
+    Array.prototype.forEach.call(menu.querySelectorAll('.n-base-select-option, .n-dropdown-option'), function (option) {
+      var content = option.querySelector('.n-base-select-option__content, .n-dropdown-option-body') || option;
+      var style = window.getComputedStyle(option);
+      var width = (content.scrollWidth || content.getBoundingClientRect().width || 0)
+        + (parseFloat(style.paddingLeft) || 0)
+        + (parseFloat(style.paddingRight) || 0);
+      if (width > widest) widest = width;
+    });
+    return widest || menu.getBoundingClientRect().width || 0;
+  }
   function ensureAuthPageState() {
     if (!document.body) return;
     document.body.classList.toggle(AUTH_PAGE_CLASS, isAuthPath(readCurrentHashPath()));
@@ -4571,13 +4600,16 @@
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + '{'
       + 'max-height:inherit;'
       + 'overflow-y:auto;'
+      + 'overflow-x:hidden;'
       + 'overscroll-behavior:contain;'
+      + 'scrollbar-gutter:stable;'
       + '-webkit-overflow-scrolling:touch;'
       + '}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + ' .n-scrollbar-container,'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + ' .n-scrollbar-content{'
       + 'max-height:inherit;'
       + 'overflow-y:auto;'
+      + 'overflow-x:hidden;'
       + '}';
     document.head.appendChild(style);
   }
@@ -4636,16 +4668,29 @@
       scheduleAuthLocaleDropdownSync();
       requestAnimationFrame(scheduleAuthLocaleDropdownSync);
     };
-    var stopAndSync = function (event) {
+    var stopEvent = function (event) {
+      if (!event) return;
+      if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+      }
       event.stopPropagation();
+    };
+    var stopWheelAndSync = function (event) {
+      stopEvent(event);
+      syncLater();
+    };
+    var stopScrollbarPointerAndSync = function (event) {
+      if (event.target === menuView) {
+        stopEvent(event);
+      }
       syncLater();
     };
     var syncOnly = function () {
       syncLater();
     };
-    menuView.addEventListener('wheel', stopAndSync, { passive: true });
-    menuView.addEventListener('mousedown', stopAndSync);
-    menuView.addEventListener('pointerdown', stopAndSync);
+    menuView.addEventListener('wheel', stopWheelAndSync, { passive: true, capture: true });
+    menuView.addEventListener('mousedown', stopScrollbarPointerAndSync, true);
+    menuView.addEventListener('pointerdown', stopScrollbarPointerAndSync, true);
     menuView.addEventListener('scroll', syncOnly, { passive: true });
     menuView.__xcAuthLocaleInteractionBound = true;
   }
@@ -4661,7 +4706,10 @@
       view.classList.remove(AUTH_LOCALE_VIEW_CLASS);
       view.style.maxHeight = '';
       view.style.overflowY = '';
+      view.style.overflowX = '';
       view.style.overscrollBehavior = '';
+      view.style.scrollbarGutter = '';
+      view.__xcAuthLocaleStableWidth = 0;
     });
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_FOLLOWER_CLASS), function (follower) {
       follower.classList.remove(AUTH_LOCALE_FOLLOWER_CLASS);
@@ -4711,17 +4759,30 @@
     menu.style.width = '100%';
     menuView.style.maxHeight = maxHeight + 'px';
     menuView.style.overflowY = 'auto';
+    menuView.style.overflowX = 'hidden';
     menuView.style.overscrollBehavior = 'contain';
+    menuView.style.scrollbarGutter = 'stable';
 
     requestAnimationFrame(function () {
       if (!menu.isConnected) return;
       var followerRect = follower.getBoundingClientRect();
       var panelRect = panel.getBoundingClientRect();
-      var width = Math.min(panelRect.width || followerRect.width || maxWidth, maxWidth);
       var height = Math.min(Math.max(menuView.scrollHeight || 0, panelRect.height || followerRect.height || 0), maxHeight);
-      if (!width) width = maxWidth;
       if (!height) height = maxHeight;
       var triggerRect = trigger ? trigger.getBoundingClientRect() : followerRect;
+      var needsVerticalScroll = (menuView.scrollHeight || 0) > height + 1;
+      var reservedScrollbar = needsVerticalScroll ? getAuthLocaleScrollbarWidth() : 0;
+      var contentWidth = Math.max(
+        triggerRect.width || 0,
+        getAuthLocaleOptionContentWidth(menu)
+      );
+      var stableWidth = menuView.__xcAuthLocaleStableWidth || 0;
+      var width = Math.min(maxWidth, Math.max(
+        stableWidth,
+        contentWidth + reservedScrollbar
+      ));
+      if (!width) width = maxWidth;
+      menuView.__xcAuthLocaleStableWidth = width;
       var left = clamp(triggerRect.right - width, margin, window.innerWidth - width - margin);
       var top = clamp(triggerRect.top - height - 8, margin, window.innerHeight - height - margin);
 

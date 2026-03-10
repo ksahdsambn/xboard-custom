@@ -306,3 +306,42 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
 
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 登录页语言面板桌面端滚动闪屏修复
+
+#### 1. 问题现象
+
+- 登录页语言面板在桌面端已经不再溢出视口，但用户滚动滚轮或操作滚动条后，面板仍会出现明显横向跳动。
+- 语言面板一旦横跳，鼠标很容易离开原本的滚动区域，用户会感觉面板在“闪屏”或“突然消失”，导致难以继续选择较靠后的语言。
+
+#### 2. 根因定位
+
+- 旧补丁在每次 `wheel / scroll` 后都会重新执行 `fitAuthLocaleDropdown()`，这是必要的。
+- 但宽度计算错误地依赖了菜单容器当前的 `scrollWidth / width`。
+- 当桌面端滚动条出现后，容器宽度会被滚动条和当前布局状态放大；下一轮同步又把这个放大的宽度当作新的基准，导致：
+  - 面板越滚越宽；
+  - 右对齐定位下，面板不断向左跳；
+  - 用户鼠标与菜单区域错位，看起来像“闪屏”。
+
+#### 3. 修复方式
+
+- 继续修复 `theme/XboardCustom/assets/i18n-extra.js`
+- 新增认证页语言面板的稳定宽度计算逻辑：
+  - 不再使用菜单容器当前宽度作为基准；
+  - 改为测量真实选项文本的自然宽度；
+  - 再叠加桌面端滚动条预留宽度，得到稳定面板宽度。
+- 同时补强桌面端滚动交互守卫：
+  - `wheel` 在捕获阶段拦截并重新同步定位；
+  - `mousedown / pointerdown` 仅在点击滚动层本身时拦截，避免滚动条交互被外层误判；
+  - 为滚动层补充 `overflow-x:hidden` 与 `scrollbar-gutter: stable`，减少桌面端滚动条出现时的布局抖动。
+
+#### 4. 预期结果
+
+- 用户在 `#/login` 页面打开语言面板后，滚动列表时面板宽度和 `left/top` 保持稳定。
+- 即使滚动到较靠后的语言，鼠标也不会因为面板横跳而脱离可交互区域。
+- 用户可以正常选择如 `Suomi`、`Norsk Bokmål` 等较靠后的语言项。
+
+#### 5. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
