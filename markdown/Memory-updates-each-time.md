@@ -170,3 +170,38 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `theme/XboardCustom/assets/wallet-center.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-10 主题静态资源缓存修复
+
+#### 1. 问题定位
+
+- 在修复登录页语言切换和钱包浮层逻辑后，代码已经推送并执行了 `xboard-custom-sync`，但线上页面表现“毫无变化”。
+- 实际排查结果是：
+  - 线上 HTML 已在使用 `XboardCustom`
+  - 但 `https://node.lokiflux.com/theme/XboardCustom/assets/wallet-center.js`
+  - 与 `https://node.lokiflux.com/theme/XboardCustom/assets/i18n-extra.js`
+    仍返回旧内容
+  - 响应头显示 Cloudflare `cf-cache-status: HIT`
+- 结论：
+  - 本次不是业务修复失效
+  - 而是 CDN/静态资源缓存导致浏览器继续拿到旧版主题脚本
+
+#### 2. 修复方式
+
+- 修复 `theme/XboardCustom/dashboard.blade.php`
+- 为以下自定义主题静态资源追加基于 `filemtime(public_path(...))` 的版本参数：
+  - `wallet-center.css`
+  - `i18n-extra.js`
+  - `umi.js`
+  - `wallet-center.js`
+- 这样在 `refreshCurrentTheme()` 重新发布主题资源后，资源 URL 会随文件时间变化，避免继续命中旧 CDN 缓存。
+
+#### 3. 影响
+
+- 后续只要这些主题静态文件发生变化并被重新发布，前端引用 URL 就会自动变化。
+- 这样可以显著降低“代码已同步、页面无变化”的缓存误判概率。
+
+#### 4. 本次涉及文件
+
+- `theme/XboardCustom/dashboard.blade.php`
+- `markdown/Memory-updates-each-time.md`

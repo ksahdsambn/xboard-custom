@@ -2,10 +2,16 @@
 <html lang="zh-CN">
 
 <head>
+  @php
+    $walletCssVersion = @filemtime(public_path("theme/{$theme}/assets/wallet-center.css")) ?: $version;
+    $i18nExtraVersion = @filemtime(public_path("theme/{$theme}/assets/i18n-extra.js")) ?: $version;
+    $umiVersion = @filemtime(public_path("theme/{$theme}/assets/umi.js")) ?: $version;
+    $walletJsVersion = @filemtime(public_path("theme/{$theme}/assets/wallet-center.js")) ?: $version;
+  @endphp
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no" />
   <title>{{$title}}</title>
-  <link rel="stylesheet" href="/theme/{{$theme}}/assets/wallet-center.css">
+  <link rel="stylesheet" href="/theme/{{$theme}}/assets/wallet-center.css?v={{ $walletCssVersion }}">
   <script>
     window.routerBase = "/";
     window.settings = {
@@ -47,14 +53,14 @@
       walletHash: '#/dashboard?xc_wallet=1'
     };
   </script>
-  <script src="/theme/{{$theme}}/assets/i18n-extra.js"></script>
-  <script type="module" crossorigin src="/theme/{{$theme}}/assets/umi.js"></script>
+  <script src="/theme/{{$theme}}/assets/i18n-extra.js?v={{ $i18nExtraVersion }}"></script>
+  <script type="module" crossorigin src="/theme/{{$theme}}/assets/umi.js?v={{ $umiVersion }}"></script>
 </head>
 
 <body>
   <div id="app"></div>
   {!! $theme_config['custom_html'] !!}
-  <script src="/theme/{{$theme}}/assets/wallet-center.js"></script>
+  <script src="/theme/{{$theme}}/assets/wallet-center.js?v={{ $walletJsVersion }}"></script>
 </body>
 
 </html>
