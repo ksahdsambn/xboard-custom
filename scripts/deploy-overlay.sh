@@ -6,6 +6,7 @@ OFFICIAL_ROOT="${OFFICIAL_ROOT:-}"
 WEB_SERVICE="${WEB_SERVICE:-web}"
 HORIZON_SERVICE="${HORIZON_SERVICE:-horizon}"
 THEME_NAME="${THEME_NAME:-XboardCustom}"
+THEME_TARGET_ROOT="${THEME_TARGET_ROOT:-storage/theme}"
 DRY_RUN="${DRY_RUN:-0}"
 COMPOSE_BIN="${COMPOSE_BIN:-docker compose}"
 
@@ -93,7 +94,7 @@ refresh_theme_if_possible() {
 sync_dir "${CUSTOM_ROOT}/plugins/StripePayment" "${OFFICIAL_ROOT}/plugins/StripePayment"
 sync_dir "${CUSTOM_ROOT}/plugins/BepusdtPayment" "${OFFICIAL_ROOT}/plugins/BepusdtPayment"
 sync_dir "${CUSTOM_ROOT}/plugins/WalletCenter" "${OFFICIAL_ROOT}/plugins/WalletCenter"
-sync_dir "${CUSTOM_ROOT}/theme/${THEME_NAME}" "${OFFICIAL_ROOT}/theme/${THEME_NAME}"
+sync_dir "${CUSTOM_ROOT}/theme/${THEME_NAME}" "${OFFICIAL_ROOT}/${THEME_TARGET_ROOT}/${THEME_NAME}"
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "Dry run completed"
