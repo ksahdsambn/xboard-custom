@@ -207,7 +207,7 @@
 ### 6.1 允许触达
 
 - `plugins/StripePayment/`
-- `plugins/BEpusdtPayment/`
+- `plugins/BepusdtPayment/`
 - `plugins/WalletCenter/`
 - `theme/XboardCustom/`
 - `public/plugins/` 下的插件已发布静态资源

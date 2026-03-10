@@ -19,7 +19,7 @@
 | 资产类型 | 资产名 | 代码标识 | 目录 | 运行时标识 |
 | --- | --- | --- | --- | --- |
 | 支付插件 | `StripePayment` | `stripe_payment` | `plugins/StripePayment/` | 支付方式键：`Stripe` |
-| 支付插件 | `BEpusdtPayment` | `bepusdt_payment` | `plugins/BEpusdtPayment/` | 支付方式键：`BEpusdt` |
+| 支付插件 | `BEpusdtPayment` | `bepusdt_payment` | `plugins/BepusdtPayment/` | 支付方式键：`BEpusdt` |
 | 功能插件 | `WalletCenter` | `wallet_center` | `plugins/WalletCenter/` | 插件功能键：`wallet_center` |
 | 自定义主题 | `XboardCustom` | 不适用 | `theme/XboardCustom/` | 主题名：`XboardCustom` |
 
@@ -149,12 +149,12 @@
 
 ### 5.2 BEpusdtPayment 最小集合
 
-- `plugins/BEpusdtPayment/config.json`
-- `plugins/BEpusdtPayment/Plugin.php`
-- `plugins/BEpusdtPayment/routes/`
-- `plugins/BEpusdtPayment/resources/`
-- `plugins/BEpusdtPayment/database/migrations/`（如有）
-- `plugins/BEpusdtPayment/Commands/`（如有）
+- `plugins/BepusdtPayment/config.json`
+- `plugins/BepusdtPayment/Plugin.php`
+- `plugins/BepusdtPayment/routes/`
+- `plugins/BepusdtPayment/resources/`
+- `plugins/BepusdtPayment/database/migrations/`（如有）
+- `plugins/BepusdtPayment/Commands/`（如有）
 - 第三方 SDK 或本地 library 目录（如有）
 
 ### 5.3 WalletCenter 最小集合
