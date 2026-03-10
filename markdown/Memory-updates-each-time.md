@@ -345,3 +345,43 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
 
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 登录页语言面板最终回归与 1Panel 更新命令确认
+
+#### 1. 最终问题确认
+
+- 继续复核后确认，登录页语言选择框“滚一下就闪屏/跳屏”的直接表现，不只是纵向滚动后重新定位。
+- 真正影响可用性的是：语言面板在桌面端滚轮或滚动条交互后会发生横向跳动，导致鼠标很容易脱离面板可交互区域，用户看起来会误以为下拉框突然闪掉，实际上是 follower 宽度和位置在抖动。
+
+#### 2. 最终修复确认
+
+- 最终保留的修复仍收敛在 `theme/XboardCustom/assets/i18n-extra.js`。
+- 这次确认有效的修复点是：
+  - 为认证页语言面板新增“稳定宽度”计算，不再使用菜单容器当前 `scrollWidth / width` 作为下一轮定位基准。
+  - 改为按真实语言项文本自然宽度 + 桌面端滚动条预留宽度来计算面板宽度，避免滚轮后面板越滚越宽、越滚越向左跳。
+  - 保留认证页下拉层的 `wheel / mousedown / pointerdown / scroll` 本地交互守卫，并为滚动层补充 `overflow-x:hidden` 与 `scrollbar-gutter: stable`，减少滚动条出现时的布局抖动。
+
+#### 3. 运行态回归
+
+- 使用 Playwright 将本地修复后的 `i18n-extra.js` 注入线上登录页 `https://node.lokiflux.com/#/login` 进行回归。
+- 回归结果确认：
+  - 滚轮后语言列表 `scrollTop` 正常变化；
+  - 面板宽度保持稳定，不再横向跳动；
+  - 滚动后可以成功选择 `Suomi`；
+  - `VUE_NAIVE_LOCALE` 与 `document.documentElement.lang` 都正确切换到 `fi-FI`。
+
+#### 4. 1Panel 更新命令确认
+
+- 当前 1Panel 服务器计划任务使用以下命令从 GitHub 拉取并部署 overlay：
+```bash
+set -euo pipefail
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
+```
+- 该命令会在仓库存在新的 `plugins/` 或 `theme/` 运行时改动时完成拉取、overlay 同步、服务重启和主题静态资源刷新。
+- 如后续遇到“GitHub 无新提交，但需要强制重发当前 overlay” 的场景，可在同一命令前额外设置 `FORCE_DEPLOY=1`。
+
+#### 5. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
+- `scripts/update-overlay-from-git.sh`
