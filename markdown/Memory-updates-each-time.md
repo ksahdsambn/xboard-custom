@@ -235,3 +235,12 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
 
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
+
+#### 5. 二次定位修正
+
+- 首次补丁已成功上线，但线上继续出现语言弹层顶部溢出。
+- 进一步确认后发现，Naive UI 语言选择器真正控制定位的是上层 `v-binder-follower-container` 及其 `transform`，不是仅修改 `n-dropdown-menu` 本身就能生效。
+- 因此补丁调整为：
+  - 直接接管 follower 容器的 `position / inset / transform / left / top`
+  - 同时限制语言面板高度并保留内部滚动
+  - 避免保留原始“向上弹出”的 transform 导致弹层继续跑出屏幕

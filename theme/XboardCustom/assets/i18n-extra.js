@@ -4503,7 +4503,8 @@
                }
 };
   var AUTH_LOCALE_MENU_CLASS = 'xc-auth-locale-dropdown';
-  var AUTH_LOCALE_POPOVER_CLASS = 'xc-auth-locale-popover';
+  var AUTH_LOCALE_PANEL_CLASS = 'xc-auth-locale-panel';
+  var AUTH_LOCALE_FOLLOWER_CLASS = 'xc-auth-locale-follower';
   var AUTH_PAGE_CLASS = 'xc-auth-page';
   var authLocaleLayoutFrame = 0;
   var authLocaleObserver = null;
@@ -4562,7 +4563,8 @@
     var style = document.createElement('style');
     style.id = 'xc-auth-locale-style';
     style.textContent = ''
-      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_POPOVER_CLASS + '{z-index:3200;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_FOLLOWER_CLASS + '{z-index:3200;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_PANEL_CLASS + '{overflow:hidden;}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_MENU_CLASS + '{'
       + 'max-height:min(70vh,calc(100vh - 24px));'
       + 'overflow-y:auto;'
@@ -4585,8 +4587,17 @@
     });
     return hits >= 4;
   }
-  function getLocalePopover(menu) {
-    return menu.closest('.n-popover') || menu.parentElement || menu;
+  function getLocaleFollower(menu) {
+    return menu.closest('.v-binder-follower-container')
+      || menu.closest('.n-popover')
+      || menu.parentElement
+      || menu;
+  }
+  function getLocalePanel(menu) {
+    return menu.closest('.n-dropdown')
+      || menu.closest('.n-popover')
+      || menu.parentElement
+      || menu;
   }
   function clearAuthLocaleLayout() {
     if (!document.body) return;
@@ -4597,33 +4608,55 @@
       menu.style.overscrollBehavior = '';
       menu.style.width = '';
     });
-    Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_POPOVER_CLASS), function (popover) {
-      popover.classList.remove(AUTH_LOCALE_POPOVER_CLASS);
-      popover.style.position = '';
-      popover.style.top = '';
-      popover.style.left = '';
-      popover.style.right = '';
-      popover.style.bottom = '';
-      popover.style.width = '';
-      popover.style.maxWidth = '';
-      popover.style.maxHeight = '';
+    Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_PANEL_CLASS), function (panel) {
+      panel.classList.remove(AUTH_LOCALE_PANEL_CLASS);
+      panel.style.width = '';
+      panel.style.maxWidth = '';
+      panel.style.maxHeight = '';
+      panel.style.overflow = '';
+      panel.style.transform = '';
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_FOLLOWER_CLASS), function (follower) {
+      follower.classList.remove(AUTH_LOCALE_FOLLOWER_CLASS);
+      follower.style.position = '';
+      follower.style.top = '';
+      follower.style.left = '';
+      follower.style.right = '';
+      follower.style.bottom = '';
+      follower.style.width = '';
+      follower.style.maxWidth = '';
+      follower.style.maxHeight = '';
+      follower.style.margin = '';
+      follower.style.inset = '';
+      follower.style.transform = '';
+      follower.style.transformOrigin = '';
     });
   }
   function fitAuthLocaleDropdown(menu) {
     if (!document.body || !document.body.classList.contains(AUTH_PAGE_CLASS) || !menu.isConnected) return;
-    var popover = getLocalePopover(menu);
-    if (!popover) return;
+    var follower = getLocaleFollower(menu);
+    var panel = getLocalePanel(menu);
+    if (!follower || !panel) return;
     var margin = window.innerWidth <= 720 ? 12 : 16;
     var maxHeight = Math.max(240, Math.min(window.innerHeight - margin * 2, Math.round(window.innerHeight * 0.72)));
     var maxWidth = Math.max(220, Math.min(320, window.innerWidth - margin * 2));
 
     menu.classList.add(AUTH_LOCALE_MENU_CLASS);
-    popover.classList.add(AUTH_LOCALE_POPOVER_CLASS);
-    popover.style.position = 'fixed';
-    popover.style.right = 'auto';
-    popover.style.bottom = 'auto';
-    popover.style.maxWidth = maxWidth + 'px';
-    popover.style.maxHeight = maxHeight + 'px';
+    panel.classList.add(AUTH_LOCALE_PANEL_CLASS);
+    follower.classList.add(AUTH_LOCALE_FOLLOWER_CLASS);
+    follower.style.position = 'fixed';
+    follower.style.right = 'auto';
+    follower.style.bottom = 'auto';
+    follower.style.inset = 'auto';
+    follower.style.margin = '0';
+    follower.style.transform = 'none';
+    follower.style.transformOrigin = 'center center';
+    follower.style.maxWidth = maxWidth + 'px';
+    follower.style.maxHeight = maxHeight + 'px';
+    panel.style.maxWidth = maxWidth + 'px';
+    panel.style.maxHeight = maxHeight + 'px';
+    panel.style.overflow = 'hidden';
+    panel.style.transform = 'none';
     menu.style.maxHeight = maxHeight + 'px';
     menu.style.overflowY = 'auto';
     menu.style.overscrollBehavior = 'contain';
@@ -4631,25 +4664,33 @@
 
     requestAnimationFrame(function () {
       if (!menu.isConnected) return;
-      var rect = popover.getBoundingClientRect();
-      var width = Math.min(rect.width || maxWidth, maxWidth);
-      var height = Math.min(rect.height || maxHeight, maxHeight);
-      var left = clamp(rect.left, margin, window.innerWidth - width - margin);
-      var top = clamp(rect.top, margin, window.innerHeight - height - margin);
+      var followerRect = follower.getBoundingClientRect();
+      var panelRect = panel.getBoundingClientRect();
+      var width = Math.min(panelRect.width || followerRect.width || maxWidth, maxWidth);
+      var height = Math.min(panelRect.height || followerRect.height || maxHeight, maxHeight);
+      if (!width) width = maxWidth;
+      if (!height) height = maxHeight;
+      var left = clamp(followerRect.left, margin, window.innerWidth - width - margin);
+      var top = clamp(followerRect.top, margin, window.innerHeight - height - margin);
 
       if (window.innerWidth <= 720) {
         width = Math.min(window.innerWidth - margin * 2, Math.max(width, 240));
         left = clamp(window.innerWidth - width - margin, margin, window.innerWidth - width - margin);
-        popover.style.width = width + 'px';
-        rect = popover.getBoundingClientRect();
-        height = Math.min(rect.height || maxHeight, maxHeight);
-        top = clamp(rect.top, margin, window.innerHeight - height - margin);
-      } else {
-        popover.style.width = width + 'px';
+        panel.style.width = width + 'px';
+        follower.style.width = width + 'px';
+        followerRect = follower.getBoundingClientRect();
+        panelRect = panel.getBoundingClientRect();
+        height = Math.min(panelRect.height || maxHeight, maxHeight);
+        top = clamp(followerRect.top, margin, window.innerHeight - height - margin);
       }
 
-      popover.style.left = Math.round(left) + 'px';
-      popover.style.top = Math.round(top) + 'px';
+      if (window.innerWidth > 720) {
+        panel.style.width = width + 'px';
+        follower.style.width = width + 'px';
+      }
+
+      follower.style.left = Math.round(left) + 'px';
+      follower.style.top = Math.round(top) + 'px';
     });
   }
   function syncAuthLocaleDropdowns() {
