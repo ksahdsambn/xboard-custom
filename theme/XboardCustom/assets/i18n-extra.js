@@ -4630,6 +4630,25 @@
     });
     return buttons[0];
   }
+  function bindAuthLocaleInteractionGuards(menuView) {
+    if (!menuView || menuView.__xcAuthLocaleInteractionBound) return;
+    var syncLater = function () {
+      scheduleAuthLocaleDropdownSync();
+      requestAnimationFrame(scheduleAuthLocaleDropdownSync);
+    };
+    var stopAndSync = function (event) {
+      event.stopPropagation();
+      syncLater();
+    };
+    var syncOnly = function () {
+      syncLater();
+    };
+    menuView.addEventListener('wheel', stopAndSync, { passive: true });
+    menuView.addEventListener('mousedown', stopAndSync);
+    menuView.addEventListener('pointerdown', stopAndSync);
+    menuView.addEventListener('scroll', syncOnly, { passive: true });
+    menuView.__xcAuthLocaleInteractionBound = true;
+  }
   function clearAuthLocaleLayout() {
     if (!document.body) return;
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_MENU_CLASS), function (menu) {
@@ -4674,6 +4693,7 @@
     menu.classList.add(AUTH_LOCALE_MENU_CLASS);
     menuView.classList.add(AUTH_LOCALE_VIEW_CLASS);
     follower.classList.add(AUTH_LOCALE_FOLLOWER_CLASS);
+    bindAuthLocaleInteractionGuards(menuView);
     follower.style.position = 'fixed';
     follower.style.right = 'auto';
     follower.style.bottom = 'auto';
@@ -4754,8 +4774,8 @@
     return records.some(function (record) {
       return Array.prototype.some.call(record.addedNodes || [], function (node) {
         return node && node.nodeType === 1 && (
-          (node.matches && node.matches('.v-binder-follower-container, .n-popover, .n-dropdown-menu'))
-          || (node.querySelector && node.querySelector('.v-binder-follower-container, .n-popover, .n-dropdown-menu'))
+          (node.matches && node.matches('.v-binder-follower-container, .v-binder-follower-content, .n-popover, .n-dropdown-menu, .n-base-select-menu'))
+          || (node.querySelector && node.querySelector('.v-binder-follower-container, .v-binder-follower-content, .n-popover, .n-dropdown-menu, .n-base-select-menu'))
         );
       });
     });

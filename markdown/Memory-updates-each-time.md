@@ -273,4 +273,36 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
   - 直接接管 `v-binder-follower-content`
   - 用底部语言按钮的实际位置重新计算 `left / top`
   - 给 `n-base-select-menu-option-wrapper` 注入 `max-height + overflow-y:auto`
-  - 让语言列表在菜单内部滚动，而不是继续整体溢出屏幕
+- 让语言列表在菜单内部滚动，而不是继续整体溢出屏幕
+
+### 2026-03-11 登录页语言面板桌面端滚轮关闭修复
+
+#### 1. 问题现象
+
+- 在 `#/login` 页面中，语言面板已经可以完整显示，但桌面端使用鼠标滚轮滚动语言列表时，面板会被上层定位逻辑重新带偏。
+- 点击右侧滚动条或拖动滚动条时，也会触发同样的问题，用户会感觉语言面板突然消失或跳走。
+- 移动端触摸滚动正常，问题集中在桌面端的 `wheel / mousedown / pointerdown / scroll` 交互链路。
+
+#### 2. 根因定位
+
+- `n-base-select-menu-option-wrapper` 内部滚动时，Naive UI 的 follower 会再次执行自身的定位更新。
+- 前一版补丁只负责把面板首次钉回认证页语言按钮附近，没有继续接管桌面端滚轮和滚动条交互后的二次定位。
+- 结果就是：
+  - 列表可以滚动；
+  - 但滚动一发生，follower 又被上层逻辑挪回错误位置，桌面端看起来像“菜单消失”。
+
+#### 3. 修复方式
+
+- 继续修复 `theme/XboardCustom/assets/i18n-extra.js`
+- 对认证页语言面板的内部滚动层 `n-base-select-menu-option-wrapper` 增加交互守卫：
+  - `wheel` 时阻止事件继续向上冒泡，并立即重新同步面板位置；
+  - `mousedown` / `pointerdown` 时阻止事件继续向上冒泡，避免点击滚动条被外层当成关闭触发；
+  - `scroll` 时重新同步面板位置，确保滚动后仍然贴在语言按钮附近。
+- 同时补强 `MutationObserver` 的匹配范围，纳入：
+  - `v-binder-follower-content`
+  - `n-base-select-menu`
+
+#### 4. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
