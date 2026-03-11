@@ -30,6 +30,10 @@
   var authProbeAttempts = 0;
   var MAX_AUTH_PROBE_ATTEMPTS = 12;
   var AUTH_PROBE_DELAY = 700;
+  var dockProbeTimer = 0;
+  var dockProbeAttempts = 0;
+  var MAX_DOCK_PROBE_ATTEMPTS = 20;
+  var DOCK_PROBE_DELAY = 450;
 
   function dockItems() {
     return [
@@ -120,6 +124,7 @@
     node.appendChild(content);
     bindDockInteractiveTarget(node, item);
     bindDockInteractiveTarget(content, item);
+    bindDockHoverState(node, content);
     return node;
   }
 
@@ -165,7 +170,43 @@
     }
     bindDockInteractiveTarget(node, item);
     bindDockInteractiveTarget(content, item);
+    bindDockHoverState(node, content);
     return node;
+  }
+
+  function setDockHoverState(node, content, active) {
+    [node, content].forEach(function (target) {
+      if (!target) return;
+      target.classList.toggle("xc-wallet-dock__item--hover", !!active);
+    });
+    if (!content) return;
+    if (!active) {
+      content.style.backgroundColor = "";
+      content.style.boxShadow = "";
+      content.style.transform = "";
+      content.style.color = "";
+      return;
+    }
+    if (content.classList.contains("n-menu-item-content--selected")) {
+      content.style.backgroundColor = "rgba(22, 163, 74, 0.16)";
+      content.style.boxShadow = "inset 0 0 0 1px rgba(22, 163, 74, 0.12)";
+    } else {
+      content.style.backgroundColor = "rgba(15, 23, 42, 0.08)";
+      content.style.boxShadow = "inset 0 0 0 1px rgba(15, 23, 42, 0.06)";
+    }
+    content.style.transform = "translateX(1px)";
+    content.style.color = "var(--xc-text)";
+  }
+
+  function bindDockHoverState(node, content) {
+    [node, content].forEach(function (target) {
+      if (!target || target.__xcWalletDockHoverBound) return;
+      target.addEventListener("pointerenter", function () { setDockHoverState(node, content, true); });
+      target.addEventListener("pointerleave", function () { setDockHoverState(node, content, false); });
+      target.addEventListener("focus", function () { setDockHoverState(node, content, true); }, true);
+      target.addEventListener("blur", function () { setDockHoverState(node, content, false); }, true);
+      target.__xcWalletDockHoverBound = true;
+    });
   }
 
   function markDockEventHandled(event) {
@@ -285,13 +326,16 @@
     var dockVisible = shouldShowDock();
     var menuRoot = dockVisible ? getSidebarMenuRoot() : null;
     if (menuRoot) {
+      clearDockProbe();
       renderSidebarDock(menuRoot, dockVisible);
       return;
     }
     if (dockVisible && window.innerWidth > 720) {
+      scheduleDockProbe();
       renderFloatingDock(false);
       return;
     }
+    clearDockProbe();
     renderFloatingDock(dockVisible);
   }
 
@@ -369,11 +413,11 @@
       },
       "en-US": {
         wallet: "Wallet",
-        checkin: "Check-in",
-        topup: "Top up",
+        checkin: "Daily check-in",
+        topup: "Balance top-up",
         renew: "Auto renew",
         title: "WalletCenter",
-        subtitle: "Review balance, check-in, top-up and auto renew status in one place.",
+        subtitle: "Review balance, daily check-in, balance top-up and auto renew status in one place.",
         refresh: "Refresh",
         back: "Back",
         loading: "Loading wallet data",
@@ -518,6 +562,24 @@
 
   function shouldShowDock() {
     return (!!state.token || state.authed === true) && !isAuthPath(state.route.path);
+  }
+
+  function clearDockProbe() {
+    if (dockProbeTimer) {
+      clearTimeout(dockProbeTimer);
+      dockProbeTimer = 0;
+    }
+    dockProbeAttempts = 0;
+  }
+
+  function scheduleDockProbe() {
+    if (dockProbeTimer || !shouldShowDock() || window.innerWidth <= 720 || dockProbeAttempts >= MAX_DOCK_PROBE_ATTEMPTS) return;
+    dockProbeAttempts += 1;
+    dockProbeTimer = setTimeout(function () {
+      dockProbeTimer = 0;
+      scheduleDockSync();
+      if (!getSidebarMenuRoot()) scheduleDockProbe();
+    }, DOCK_PROBE_DELAY);
   }
 
   function clearAuthProbe() {
@@ -947,7 +1009,12 @@
           scheduleDockSync();
         }
       });
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "hidden", "aria-hidden"]
+      });
     }
     addEventListener("resize", scheduleDockSync, { passive: true });
     document.addEventListener("click", onDocumentClick, true);

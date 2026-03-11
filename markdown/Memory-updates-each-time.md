@@ -716,3 +716,45 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 - `theme/XboardCustom/assets/wallet-center.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 WalletCenter first-login visibility, hover feedback, and label rename
+
+#### 1. Goal
+
+- A new follow-up pass was required for three WalletCenter regressions:
+  - the WalletCenter sidebar group still failed to appear on the first dashboard render after login in some real sessions and only showed after `F5`
+  - the injected left-sidebar entries had no hover feedback, so they did not visually invite clicks
+  - `签到 / 充值` needed to be renamed to `每日签到 / 充值余额` in both the sidebar dock and WalletCenter content, with localized copy applied across all supported languages
+
+#### 2. Root Cause
+
+- The earlier fix handled delayed auth state, but the mount path could still miss the first render when the sidebar menu existed in the DOM tree but only became visible later through class/style changes.
+- The existing `MutationObserver` watched only `childList`, so style-driven visibility transitions on `.n-layout-sider` / `.n-menu` were not guaranteed to trigger a dock resync.
+- The sidebar dock also lacked any explicit hover state styling beyond the host menu defaults, which meant the custom entries stayed visually flat when the pointer moved over them.
+
+#### 3. Fix
+
+- Updated `theme/XboardCustom/assets/wallet-center.js`.
+- Added a second bounded dock probe loop that keeps retrying dock attachment for a short window when login is already valid but the visible sidebar menu is not ready yet.
+- Expanded the dock DOM observer to also watch `class`, `style`, `hidden`, and `aria-hidden` changes so first-login menu visibility changes trigger a remount without manual refresh.
+- Added explicit hover-state binding for injected sidebar items and applied hover visuals directly on the menu content element, so pointer/focus feedback is not dependent on host menu CSS behavior.
+- Updated the WalletCenter dock labels and WalletCenter section headings from:
+  - `签到` -> `每日签到`
+  - `充值` -> `充值余额`
+- Updated `theme/XboardCustom/assets/i18n-extra.js` so `payload.wallet` now carries the renamed `checkin`, `topup`, and subtitle wording across all 20 supported locales.
+
+#### 4. Verification
+
+- `node --check theme/XboardCustom/assets/wallet-center.js`
+- `node --check theme/XboardCustom/assets/i18n-extra.js`
+- Playwright mock-browser regression confirmed:
+  - when auth data appears after the first render and the sidebar menu becomes visible later via style changes, the WalletCenter dock still mounts automatically without `F5`
+  - the rendered dock labels are now `钱包 / 每日签到 / 充值余额 / 自动续费`
+  - injected hover state adds the expected inline visual state and hover marker class on the sidebar menu content
+
+#### 5. Files
+
+- `theme/XboardCustom/assets/wallet-center.js`
+- `theme/XboardCustom/assets/wallet-center.css`
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
