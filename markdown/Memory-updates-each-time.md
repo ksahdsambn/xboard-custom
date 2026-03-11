@@ -552,3 +552,35 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
+### 2026-03-11 Auth login locale trigger UX correction
+
+#### 1. Context
+
+- The previous custom auth-page locale patch solved the follower flicker path, but it rendered the expanded locale list permanently on screen.
+- The required behavior is different: keep the original locale button in its original position, and only expand the full locale list after clicking that button.
+
+#### 2. Implementation
+
+- Updated `theme/XboardCustom/assets/i18n-extra.js`.
+- Removed the auth-page always-open flow from `syncAuthLocaleDropdowns()`.
+- Bound the original auth locale button to a custom toggle flow that suppresses the native Naive UI dropdown before it can open.
+- Kept the original trigger button visible in place.
+- Reworked custom panel positioning so it opens next to the original trigger and dynamically increases column count from the actual space above or below the trigger.
+- The expanded panel now shows all locales without internal scrolling, and closes on second click or outside click.
+
+#### 3. Verification
+
+- `node --check theme/XboardCustom/assets/i18n-extra.js`
+- Playwright injection regression on `https://node.lokiflux.com/#/login`
+- Confirmed:
+  - the custom panel is hidden on initial load
+  - clicking the original locale button opens the expanded locale panel
+  - the native dropdown remains hidden
+  - the panel closes on second click or outside click
+  - selecting `Suomi` still updates `VUE_NAIVE_LOCALE` and `document.documentElement.lang`
+  - desktop `1600x900` and mobile `390x844` both open without internal scrolling
+
+#### 4. Files
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`

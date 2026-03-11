@@ -4515,6 +4515,7 @@
   var authLocaleObserver = null;
   var authLocaleScrollbarWidth = 0;
   var authCustomLocalePanel = null;
+  var authCustomLocaleTrigger = null;
   var authCustomLocaleVisible = false;
   var knownLocaleLabels = buildKnownLocaleLabels();
 
@@ -4602,8 +4603,21 @@
     localStorage.setItem('lang', value);
     return value;
   }
-  function getAuthPanelColumns() {
-    return window.innerWidth <= 720 || window.innerHeight < 820 ? 2 : 1;
+  function getAuthPanelColumns(trigger) {
+    var count = Math.max(supportedLocales.length, 1);
+    var margin = window.innerWidth <= 720 ? 12 : 16;
+    var itemHeight = 34;
+    var preferredGap = 4;
+    var rect = trigger ? trigger.getBoundingClientRect() : null;
+    var availableBelow = rect ? Math.max(window.innerHeight - rect.bottom - margin - 8, 0) : Math.max(window.innerHeight - margin * 2, 0);
+    var availableAbove = rect ? Math.max(rect.top - margin - 8, 0) : Math.max(window.innerHeight - margin * 2, 0);
+    var availableHeight = rect ? Math.max(availableBelow, availableAbove) : Math.max(window.innerHeight - margin * 2, 0);
+    var singleColumnHeight = count * itemHeight + 8;
+    if (singleColumnHeight <= availableHeight) return 1;
+    var columnsByHeight = Math.ceil((count * itemHeight) / Math.max(availableHeight - 16, itemHeight));
+    var minColumnWidth = window.innerWidth <= 480 ? 140 : 150;
+    var maxColumnsByWidth = Math.max(1, Math.floor((window.innerWidth - margin * 2 + preferredGap) / (minColumnWidth + preferredGap)));
+    return clamp(columnsByHeight, 1, Math.min(maxColumnsByWidth, 4));
   }
   function getExpandedAuthLocalePanelWidth(panel, columns) {
     if (!panel) return 220;
@@ -4612,9 +4626,17 @@
       width = Math.max(width, option.scrollWidth + 24);
     });
     if (columns > 1) {
-      return Math.min(window.innerWidth - 24, Math.max(280, width * columns + 12));
+      var totalGap = Math.max(columns - 1, 0) * 4;
+      return Math.min(window.innerWidth - 24, Math.max(280, width * columns + totalGap + 16));
     }
-    return Math.min(window.innerWidth - 32, Math.min(320, width + 16));
+    return Math.min(window.innerWidth - 24, Math.min(360, width + 16));
+  }
+  function getExpandedAuthLocalePanelHeight(columns) {
+    var count = Math.max(supportedLocales.length, 1);
+    var rows = Math.ceil(count / Math.max(columns, 1));
+    var rowGap = columns > 1 ? 4 : 0;
+    var verticalPadding = columns > 1 ? 16 : 8;
+    return rows * 34 + Math.max(rows - 1, 0) * rowGap + verticalPadding;
   }
   function readCurrentHashPath() {
     var raw = String(window.location.hash || '').replace(/^#/, '');
@@ -4688,9 +4710,10 @@
       + 'position:fixed;'
       + 'z-index:3202;'
       + 'display:none;'
+      + 'grid-auto-flow:row;'
       + 'min-width:220px;'
-      + 'max-width:min(96vw,360px);'
-      + 'overflow:visible;'
+      + 'max-width:min(96vw,720px);'
+      + 'overflow:hidden;'
       + 'padding:4px 0;'
       + 'border-radius:3px;'
       + 'background:#fff;'
@@ -4701,9 +4724,11 @@
       + 'opacity:1!important;'
       + 'transform:none!important;'
       + '}'
-      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-open=\"true\"]{display:block;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-open=\"true\"]{display:grid;}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-columns=\"1\"]{grid-template-columns:1fr;gap:0;}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-columns=\"2\"]{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:8px;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-columns=\"3\"]{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:8px;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-columns=\"4\"]{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:8px;}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_OPTION_CLASS + '{'
       + 'display:flex;'
       + 'align-items:center;'
@@ -4713,6 +4738,7 @@
       + 'color:rgb(51, 54, 57);'
       + 'cursor:pointer;'
       + 'user-select:none;'
+      + 'min-width:0;'
       + 'white-space:nowrap;'
       + 'transition:none!important;'
       + 'animation:none!important;'
@@ -4812,6 +4838,7 @@
     panel.className = AUTH_CUSTOM_PANEL_CLASS;
     panel.setAttribute('data-open', 'false');
     panel.setAttribute('data-columns', '1');
+    panel.setAttribute('role', 'listbox');
     panel.addEventListener('click', function (event) {
       event.stopPropagation();
     });
@@ -4838,6 +4865,8 @@
       option.className = AUTH_CUSTOM_OPTION_CLASS + (entry.value === current ? ' ' + AUTH_CUSTOM_OPTION_ACTIVE_CLASS : '');
       option.textContent = entry.label;
       option.setAttribute('data-locale', entry.value);
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', entry.value === current ? 'true' : 'false');
       option.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -4849,6 +4878,50 @@
       panel.appendChild(option);
     });
     return panel;
+  }
+  function stopAuthLocaleTriggerEvent(event) {
+    if (!event) return;
+    event.preventDefault();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+    event.stopPropagation();
+  }
+  function bindAuthCustomLocaleTrigger(trigger) {
+    if (!trigger) return null;
+    authCustomLocaleTrigger = trigger;
+    trigger.classList.add(AUTH_CUSTOM_TRIGGER_CLASS);
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', authCustomLocaleVisible ? 'true' : 'false');
+    if (trigger.__xcAuthCustomLocaleBound) return trigger;
+    var suppressNativeOpen = function (event) {
+      stopAuthLocaleTriggerEvent(event);
+    };
+    var togglePanel = function (event) {
+      stopAuthLocaleTriggerEvent(event);
+      if (authCustomLocaleVisible && authCustomLocaleTrigger === trigger) {
+        hideAuthCustomLocalePanel();
+        return;
+      }
+      showAuthCustomLocalePanel(trigger);
+    };
+    var handleKeydown = function (event) {
+      if (!event) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        togglePanel(event);
+        return;
+      }
+      if (event.key === 'Escape') {
+        stopAuthLocaleTriggerEvent(event);
+        hideAuthCustomLocalePanel();
+      }
+    };
+    trigger.addEventListener('pointerdown', suppressNativeOpen, true);
+    trigger.addEventListener('mousedown', suppressNativeOpen, true);
+    trigger.addEventListener('click', togglePanel, true);
+    trigger.addEventListener('keydown', handleKeydown, true);
+    trigger.__xcAuthCustomLocaleBound = true;
+    return trigger;
   }
   function hideNativeAuthLocaleDropdowns() {
     Array.prototype.forEach.call(document.querySelectorAll('.v-binder-follower-container .n-base-select-menu, .v-binder-follower-container .n-dropdown-menu'), function (menu) {
@@ -4867,68 +4940,64 @@
   function positionAuthCustomLocalePanel(trigger) {
     var panel = ensureAuthCustomLocalePanel();
     if (!panel) return;
+    var anchor = trigger || authCustomLocaleTrigger || getAuthLocaleTrigger();
+    if (!anchor || !anchor.isConnected) {
+      hideAuthCustomLocalePanel();
+      return;
+    }
     var margin = window.innerWidth <= 720 ? 12 : 16;
-    var columns = getAuthPanelColumns();
+    var rect = anchor.getBoundingClientRect();
+    var columns = getAuthPanelColumns(anchor);
+    var width = getExpandedAuthLocalePanelWidth(panel, columns);
+    var height = getExpandedAuthLocalePanelHeight(columns);
+    var availableBelow = Math.max(window.innerHeight - rect.bottom - margin - 8, 0);
+    var availableAbove = Math.max(rect.top - margin - 8, 0);
+    var openBelow = availableBelow >= height || availableBelow >= availableAbove;
+    var top = openBelow ? rect.bottom + 8 : rect.top - height - 8;
+    var left = clamp(rect.right - width, margin, window.innerWidth - width - margin);
     panel.style.display = 'grid';
     panel.setAttribute('data-open', 'true');
     panel.setAttribute('data-columns', String(columns));
     panel.style.position = 'fixed';
-    panel.style.top = margin + 'px';
+    panel.style.top = Math.round(clamp(top, margin, window.innerHeight - height - margin)) + 'px';
+    panel.style.left = Math.round(left) + 'px';
+    panel.style.right = 'auto';
     panel.style.bottom = 'auto';
     panel.style.maxHeight = 'none';
-    panel.style.overflow = 'visible';
-    panel.style.gridTemplateColumns = columns === 1 ? '1fr' : 'repeat(2,minmax(0,1fr))';
+    panel.style.overflow = 'hidden';
+    panel.style.gridTemplateColumns = 'repeat(' + columns + ',minmax(0,1fr))';
     panel.style.gap = columns === 1 ? '0' : '4px';
     panel.style.padding = columns === 1 ? '4px 0' : '8px';
-    var width = getExpandedAuthLocalePanelWidth(panel, columns);
-    if (columns === 1) {
-      panel.style.left = 'auto';
-      panel.style.right = margin + 'px';
-      panel.style.width = Math.round(width) + 'px';
-      return;
-    }
-    panel.style.left = margin + 'px';
-    panel.style.right = margin + 'px';
-    panel.style.width = 'auto';
+    panel.style.width = Math.round(width) + 'px';
   }
-  function showAuthCustomLocalePanel() {
+  function showAuthCustomLocalePanel(trigger) {
     if (!document.body || !document.body.classList.contains(AUTH_PAGE_CLASS)) return;
+    authCustomLocaleTrigger = trigger || authCustomLocaleTrigger || getAuthLocaleTrigger();
     renderAuthCustomLocalePanel();
-    positionAuthCustomLocalePanel();
+    positionAuthCustomLocalePanel(authCustomLocaleTrigger);
     authCustomLocaleVisible = true;
+    if (authCustomLocaleTrigger && authCustomLocaleTrigger.isConnected) {
+      authCustomLocaleTrigger.setAttribute('aria-expanded', 'true');
+    }
     hideNativeAuthLocaleDropdowns();
   }
   function hideAuthCustomLocalePanel() {
-    if (!authCustomLocalePanel) return;
-    authCustomLocalePanel.setAttribute('data-open', 'false');
-    authCustomLocalePanel.style.display = 'none';
+    if (authCustomLocalePanel) {
+      authCustomLocalePanel.setAttribute('data-open', 'false');
+      authCustomLocalePanel.style.display = 'none';
+    }
     authCustomLocaleVisible = false;
-  }
-  function hideAuthLocaleTrigger(trigger) {
-    if (!trigger) return;
-    trigger.classList.add(AUTH_CUSTOM_TRIGGER_CLASS);
-    trigger.style.display = 'none';
-    trigger.style.pointerEvents = 'none';
-    trigger.setAttribute('tabindex', '-1');
-    trigger.setAttribute('aria-hidden', 'true');
+    if (authCustomLocaleTrigger && authCustomLocaleTrigger.isConnected) {
+      authCustomLocaleTrigger.setAttribute('aria-expanded', 'false');
+    }
   }
   function restoreAuthLocaleTrigger() {
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_CUSTOM_TRIGGER_CLASS), function (trigger) {
       trigger.classList.remove(AUTH_CUSTOM_TRIGGER_CLASS);
-      trigger.style.display = '';
-      trigger.style.pointerEvents = '';
-      trigger.removeAttribute('tabindex');
-      trigger.removeAttribute('aria-hidden');
+      trigger.removeAttribute('aria-haspopup');
+      trigger.removeAttribute('aria-expanded');
     });
-  }
-  function ensureAuthExpandedLocaleList() {
-    if (!document.body || !document.body.classList.contains(AUTH_PAGE_CLASS)) return false;
-    var trigger = getAuthLocaleTrigger();
-    if (trigger) {
-      hideAuthLocaleTrigger(trigger);
-    }
-    showAuthCustomLocalePanel();
-    return !!authCustomLocalePanel;
+    authCustomLocaleTrigger = null;
   }
   function bindAuthLocaleInteractionGuards(menuView) {
     if (!menuView || menuView.__xcAuthLocaleInteractionBound) return;
@@ -5137,21 +5206,15 @@
       return;
     }
     ensureAuthLocaleStyles();
-    if (ensureAuthExpandedLocaleList()) {
-      hideNativeAuthLocaleDropdowns();
-      return;
-    }
-    Array.prototype.forEach.call(document.querySelectorAll(
-      '.v-binder-follower-content .n-base-select-menu, '
-      + '.v-binder-follower-container .n-base-select-menu, '
-      + '.v-binder-follower-content .n-dropdown-menu, '
-      + '.v-binder-follower-container .n-dropdown-menu, '
-      + '.n-popover .n-dropdown-menu'
-    ), function (menu) {
-      if (isLocaleDropdown(menu)) {
-        fitAuthLocaleDropdown(menu);
+    var trigger = bindAuthCustomLocaleTrigger(getAuthLocaleTrigger());
+    if (authCustomLocaleVisible) {
+      if (trigger) {
+        positionAuthCustomLocalePanel(trigger);
+      } else {
+        hideAuthCustomLocalePanel();
       }
-    });
+    }
+    hideNativeAuthLocaleDropdowns();
   }
   function scheduleAuthLocaleDropdownSync() {
     if (authLocaleLayoutFrame) {
@@ -5184,8 +5247,26 @@
         }
       });
       authLocaleObserver.observe(document.body, { childList: true, subtree: true });
-      document.addEventListener('click', scheduleAuthLocaleDropdownSync, true);
+      document.addEventListener('pointerdown', function (event) {
+        var target = event && event.target;
+        if (!authCustomLocaleVisible || !target) return;
+        if (authCustomLocalePanel && authCustomLocalePanel.contains(target)) return;
+        if (authCustomLocaleTrigger && authCustomLocaleTrigger.contains && authCustomLocaleTrigger.contains(target)) return;
+        hideAuthCustomLocalePanel();
+      }, true);
+      document.addEventListener('click', function (event) {
+        var target = event && event.target;
+        if (authCustomLocaleVisible && target) {
+          if (!authCustomLocalePanel || !authCustomLocalePanel.contains(target)) {
+            if (!authCustomLocaleTrigger || !authCustomLocaleTrigger.contains || !authCustomLocaleTrigger.contains(target)) {
+              hideAuthCustomLocalePanel();
+            }
+          }
+        }
+        scheduleAuthLocaleDropdownSync();
+      }, true);
       window.addEventListener('resize', scheduleAuthLocaleDropdownSync, { passive: true });
+      window.addEventListener('scroll', scheduleAuthLocaleDropdownSync, { passive: true, capture: true });
       window.addEventListener('orientationchange', scheduleAuthLocaleDropdownSync);
     }
     scheduleAuthLocaleDropdownSync();
