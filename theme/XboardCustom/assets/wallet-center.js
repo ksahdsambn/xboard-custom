@@ -44,8 +44,10 @@
         plan: "当前套餐",
         expire: "到期时间",
         renewStatus: "续费状态",
-        enabled: "已开启",
-        disabled: "未开启",
+        statusEnabled: "已开启",
+        statusDisabled: "未开启",
+        enableAction: "开启",
+        disableAction: "关闭",
         none: "无",
         claim: "立即签到",
         claimed: "今日已签到",
@@ -82,8 +84,10 @@
         plan: "Current plan",
         expire: "Expiry",
         renewStatus: "Renew status",
-        enabled: "Enabled",
-        disabled: "Disabled",
+        statusEnabled: "Enabled",
+        statusDisabled: "Disabled",
+        enableAction: "Enable",
+        disableAction: "Disable",
         none: "None",
         claim: "Claim today",
         claimed: "Claimed today",
@@ -436,7 +440,7 @@
       + '<div class="xc-wallet-metric"><span>' + esc(t("balance")) + '</span><strong>' + esc(money(user.balance || 0)) + "</strong></div>"
       + '<div class="xc-wallet-metric"><span>' + esc(t("plan")) + '</span><strong>' + esc((sub.plan && sub.plan.name) || t("none")) + "</strong></div>"
       + '<div class="xc-wallet-metric"><span>' + esc(t("expire")) + '</span><strong>' + esc(sub.expired_at ? time(Number(sub.expired_at)) : "--") + "</strong></div>"
-      + '<div class="xc-wallet-metric"><span>' + esc(t("renewStatus")) + '</span><strong>' + esc(autoConfig.enabled ? t("enabled") : t("disabled")) + "</strong></div>"
+      + '<div class="xc-wallet-metric"><span>' + esc(t("renewStatus")) + '</span><strong>' + esc(autoConfig.enabled ? t("statusEnabled") : t("statusDisabled")) + "</strong></div>"
       + "</div></div>";
 
     var ck = state.checkin.status || {};
@@ -459,11 +463,11 @@
     var renewBody = isFeatureDisabled(state.renew.error)
       ? '<div class="xc-wallet-stack">' + badge(t("disabledFeature"), "warning") + "</div>"
       : '<div class="xc-wallet-stack">'
-        + badge(autoConfig.enabled ? t("enabled") : t("disabled"), autoConfig.enabled ? "success" : "warning")
+        + badge(autoConfig.enabled ? t("statusEnabled") : t("statusDisabled"), autoConfig.enabled ? "success" : "warning")
         + "<p>" + esc(t("amount")) + ": " + esc(money(autoSub.amount || 0)) + "</p>"
         + "<p>" + esc(t("next")) + ": " + esc(autoConfig.next_scan_at ? time(autoConfig.next_scan_at) : "--") + "</p>"
         + "<p>" + esc(t("result")) + ": " + esc(autoConfig.last_result || t("none")) + "</p>"
-        + '<button type="button" data-xc="renew" data-enabled="' + (autoConfig.enabled ? "1" : "0") + '" data-variant="' + (autoConfig.enabled ? "ghost" : "success") + '">' + esc(autoConfig.enabled ? t("disabled") : t("enabled")) + "</button>"
+        + '<button type="button" data-xc="renew" data-enabled="' + (autoConfig.enabled ? "1" : "0") + '" data-variant="' + (autoConfig.enabled ? "ghost" : "success") + '">' + esc(autoConfig.enabled ? t("disableAction") : t("enableAction")) + "</button>"
         + "</div>";
 
     var ckItems = ckh.slice(0, 5).map(function (record) {

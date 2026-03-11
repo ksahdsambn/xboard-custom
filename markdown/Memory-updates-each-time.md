@@ -584,3 +584,40 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 WalletCenter auto-renew button label fix
+
+#### 1. Problem
+
+- The WalletCenter auto-renew card reused the same i18n keys for both status text and button action text.
+- This caused the right-side button to display state words such as `已开启 / 未开启` instead of the intended action words `开启 / 关闭`.
+- Some non-Chinese locales also inherited incorrect machine-translated disabled-state wording.
+
+#### 2. Fix
+
+- Updated `theme/XboardCustom/assets/wallet-center.js`.
+- Split auto-renew copy into separate status keys and action keys:
+  - `statusEnabled / statusDisabled`
+  - `enableAction / disableAction`
+- The WalletCenter metrics and badge continue to show state text.
+- The auto-renew action button now shows action text:
+  - disabled state => `开启`
+  - enabled state => `关闭`
+
+#### 3. Translations
+
+- Updated `theme/XboardCustom/assets/i18n-extra.js`.
+- Added the four new WalletCenter keys to all 20 supported locales in `payload.wallet`.
+- This keeps the auto-renew action button localized instead of falling back to English.
+
+#### 4. Verification
+
+- `node --check theme/XboardCustom/assets/wallet-center.js`
+- `node --check theme/XboardCustom/assets/i18n-extra.js`
+- Verified `statusEnabled / statusDisabled / enableAction / disableAction` each appear 20 times in `theme/XboardCustom/assets/i18n-extra.js`
+
+#### 5. Files
+
+- `theme/XboardCustom/assets/wallet-center.js`
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
