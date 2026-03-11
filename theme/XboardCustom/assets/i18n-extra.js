@@ -4505,6 +4505,7 @@
   var AUTH_LOCALE_MENU_CLASS = 'xc-auth-locale-menu';
   var AUTH_LOCALE_VIEW_CLASS = 'xc-auth-locale-menu-view';
   var AUTH_LOCALE_FOLLOWER_CLASS = 'xc-auth-locale-follower';
+  var AUTH_LOCALE_CONTAINER_CLASS = 'xc-auth-locale-container';
   var AUTH_PAGE_CLASS = 'xc-auth-page';
   var authLocaleLayoutFrame = 0;
   var authLocaleObserver = null;
@@ -4599,6 +4600,12 @@
       + 'opacity:1!important;'
       + 'transform:none!important;'
       + '}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_CONTAINER_CLASS + '{'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
+      + 'opacity:1!important;'
+      + 'transform:none!important;'
+      + '}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_MENU_CLASS + '{'
       + 'max-height:min(70vh,calc(100vh - 24px));'
       + 'overflow:hidden;'
@@ -4646,6 +4653,11 @@
       || menu.closest('.n-popover')
       || menu.parentElement
       || menu;
+  }
+  function getLocaleContainer(menu) {
+    return menu.closest('.v-binder-follower-container')
+      || menu.closest('.n-popover')
+      || null;
   }
   function getLocalePanel(menu) {
     if (menu.classList && (menu.classList.contains('n-base-select-menu') || menu.classList.contains('n-dropdown-menu'))) {
@@ -4709,11 +4721,33 @@
   }
   function clearAuthLocaleLayout() {
     if (!document.body) return;
+    Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_CONTAINER_CLASS), function (container) {
+      container.classList.remove(AUTH_LOCALE_CONTAINER_CLASS);
+      container.style.position = '';
+      container.style.top = '';
+      container.style.left = '';
+      container.style.right = '';
+      container.style.bottom = '';
+      container.style.width = '';
+      container.style.height = '';
+      container.style.margin = '';
+      container.style.inset = '';
+      container.style.transform = '';
+      container.style.transformOrigin = '';
+      container.style.transition = '';
+      container.style.animation = '';
+      container.style.opacity = '';
+      container.style.pointerEvents = '';
+      container.style.zIndex = '';
+    });
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_MENU_CLASS), function (menu) {
       menu.classList.remove(AUTH_LOCALE_MENU_CLASS);
       menu.style.maxHeight = '';
       menu.style.overflow = '';
       menu.style.width = '';
+      menu.style.transition = '';
+      menu.style.animation = '';
+      menu.style.opacity = '';
     });
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_VIEW_CLASS), function (view) {
       view.classList.remove(AUTH_LOCALE_VIEW_CLASS);
@@ -4748,6 +4782,7 @@
   function fitAuthLocaleDropdown(menu) {
     if (!document.body || !document.body.classList.contains(AUTH_PAGE_CLASS) || !menu.isConnected) return;
     var follower = getLocaleFollower(menu);
+    var container = getLocaleContainer(menu);
     var panel = getLocalePanel(menu);
     var menuView = getLocaleMenuView(panel);
     var trigger = getAuthLocaleTrigger();
@@ -4759,6 +4794,25 @@
     menu.classList.add(AUTH_LOCALE_MENU_CLASS);
     menuView.classList.add(AUTH_LOCALE_VIEW_CLASS);
     follower.classList.add(AUTH_LOCALE_FOLLOWER_CLASS);
+    if (container) {
+      container.classList.add(AUTH_LOCALE_CONTAINER_CLASS);
+      container.style.position = 'fixed';
+      container.style.top = '0';
+      container.style.left = '0';
+      container.style.right = '0';
+      container.style.bottom = 'auto';
+      container.style.width = '100%';
+      container.style.height = '0';
+      container.style.margin = '0';
+      container.style.inset = '0';
+      container.style.transform = 'none';
+      container.style.transformOrigin = 'center center';
+      container.style.transition = 'none';
+      container.style.animation = 'none';
+      container.style.opacity = '1';
+      container.style.pointerEvents = 'none';
+      container.style.zIndex = '3200';
+    }
     bindAuthLocaleInteractionGuards(menuView);
     follower.style.position = 'fixed';
     follower.style.right = 'auto';

@@ -346,6 +346,50 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
 
+### 2026-03-11 登录页语言面板外层 follower 容器动画修复
+
+#### 1. 问题现象
+
+- 即使认证页语言面板本身已经固定宽度、固定位置，用户仍反馈滚动时会“整块跳到左侧并半透明闪烁”。
+- 该现象说明问题不只发生在 `n-base-select-menu` 或 `v-binder-follower-content`，而是更外层的跟随容器仍在参与动画。
+
+#### 2. 根因定位
+
+- 继续用线上 DOM 结构复核后确认：`n-base-select-menu` 的祖先层 `v-binder-follower-container` 仍然保留 `transition: all`。
+- 当 Naive UI 在滚动交互期间重写 follower 容器的定位/transform 时，即使内部内容层已经被手动钉住，外层容器的过渡动画仍会导致：
+  - 整个语言面板向左飘；
+  - 面板出现半透明动画态；
+  - 用户看到“闪屏”和“跳屏”。
+
+#### 3. 修复方式
+
+- 继续修复 `theme/XboardCustom/assets/i18n-extra.js`
+- 新增认证页语言面板专用容器类 `xc-auth-locale-container`，直接接管 `v-binder-follower-container`。
+- 对以下三层统一强制关闭动画与过渡：
+  - `v-binder-follower-container`
+  - `v-binder-follower-content`
+  - `n-base-select-menu`
+- 脚本运行时为 container / follower / panel / menu / view 统一写入：
+  - `transform: none`
+  - `transition: none`
+  - `animation: none`
+  - `opacity: 1`
+- 同时把外层 container 固定为 `position: fixed; inset: 0; pointer-events: none; z-index: 3200`，避免 Naive UI 在桌面端滚动期间再用祖先层动画干扰语言面板。
+
+#### 4. 运行态回归
+
+- 使用 Playwright 将本地最新 `i18n-extra.js` 注入线上登录页 `https://node.lokiflux.com/#/login` 回归。
+- 回归结果确认：
+  - `n-base-select-menu`、`v-binder-follower-content`、`v-binder-follower-container` 的计算样式均为 `transition: none`；
+  - 三层均保持 `transform: none` 与 `opacity: 1`；
+  - 滚轮后语言面板位置稳定；
+  - 仍可成功选择 `Suomi`。
+
+#### 5. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
+
 ### 2026-03-11 登录页语言面板最终回归与 1Panel 更新命令确认
 
 #### 1. 最终问题确认
