@@ -674,3 +674,45 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `theme/XboardCustom/assets/wallet-center.js`
 - `theme/XboardCustom/assets/wallet-center.css`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 WalletCenter first-login mount and sidebar click fix
+
+#### 1. Goal
+
+- Two regressions were reported after moving WalletCenter into the left sidebar:
+  - the WalletCenter group did not appear on the first post-login dashboard render and only showed up after a manual `F5`
+  - the four sidebar entries (`wallet / checkin / topup / auto-renew`) rendered visually but could not be used reliably with a real mouse click
+
+#### 2. Root Cause
+
+- The first-render visibility path depended too heavily on the auth state having already stabilized during the initial dashboard mount.
+- On a fresh login redirect, the token and `/api/v1/user/info` success could arrive after the first `load(false)` pass, so the dock stayed hidden unless the page was reloaded.
+- The injected sidebar entries also sat inside a live Naive UI menu tree, and the dock sync/repaint chain could replace the clicked node during mouse interaction.
+- In practice this made the custom menu look present but feel dead because the DOM node was being rebuilt while the click sequence was still in progress.
+
+#### 3. Fix
+
+- Updated `theme/XboardCustom/assets/wallet-center.js`.
+- Added a lightweight auth probe retry loop:
+  - retries `load(false)` for a short bounded window when no token or base user info is available yet
+  - clears the retry timer immediately once auth is confirmed
+- Relaxed dock visibility gating so the sidebar dock can appear as soon as a usable bearer token exists, instead of waiting only on `state.authed === true`.
+- Hardened sidebar item interaction handling:
+  - bound direct handlers to the injected sidebar nodes
+  - executed dock navigation on `pointerdown` for real mouse interaction
+  - kept `click` and keyboard activation as fallback paths
+  - ignored dock-internal clicks from the global document-level dock sync handler so the dock no longer repaints itself during its own interaction
+
+#### 4. Verification
+
+- `node --check theme/XboardCustom/assets/wallet-center.js`
+- Playwright mock-browser regression confirmed:
+  - the sidebar WalletCenter group appears automatically after auth data is written late into storage, without a manual refresh
+  - a real mouse `down` on the injected `wallet` item switches the hash to `#/dashboard?xc_wallet=1`
+  - a real mouse `down` on the injected `renew` item switches the hash to `#/dashboard?xc_wallet=1&section=renew`
+  - the WalletCenter overlay opens and the selected sidebar item updates correctly after each interaction
+
+#### 5. Files
+
+- `theme/XboardCustom/assets/wallet-center.js`
+- `markdown/Memory-updates-each-time.md`

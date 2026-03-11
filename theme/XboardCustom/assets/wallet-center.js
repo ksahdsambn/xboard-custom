@@ -26,6 +26,10 @@
   };
   var dom = {};
   var dockSyncFrame = 0;
+  var authProbeTimer = 0;
+  var authProbeAttempts = 0;
+  var MAX_AUTH_PROBE_ATTEMPTS = 12;
+  var AUTH_PROBE_DELAY = 700;
 
   function dockItems() {
     return [
@@ -114,6 +118,8 @@
     content.appendChild(icon);
     content.appendChild(header);
     node.appendChild(content);
+    bindDockInteractiveTarget(node, item);
+    bindDockInteractiveTarget(content, item);
     return node;
   }
 
@@ -157,7 +163,77 @@
     } else {
       content.removeAttribute("data-section");
     }
+    bindDockInteractiveTarget(node, item);
+    bindDockInteractiveTarget(content, item);
     return node;
+  }
+
+  function markDockEventHandled(event) {
+    if (!event) return false;
+    if (event.__xcWalletDockHandled) return true;
+    event.__xcWalletDockHandled = true;
+    return false;
+  }
+
+  function stopDockInteractiveEvent(event, preventDefault) {
+    if (!event) return;
+    if (preventDefault) event.preventDefault();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+    event.stopPropagation();
+  }
+
+  function runDockAction(action, section, enabled) {
+    if (action === "wallet") openWallet("");
+    if (action === "section") openWallet(section || "");
+    if (action === "close") closeWallet();
+    if (action === "refresh") load(true);
+    if (action === "login") location.hash = "#/login";
+    if (action === "claim") claim();
+    if (action === "topup") createTopup();
+    if (action === "renew") toggleRenew(enabled === "1");
+  }
+
+  function bindDockInteractiveTarget(target, item) {
+    if (!target || target.__xcWalletDockBound) return;
+    if (item && item.action) {
+      target.setAttribute("data-xc", item.action);
+      if (item.section) {
+        target.setAttribute("data-section", item.section);
+      } else {
+        target.removeAttribute("data-section");
+      }
+      target.setAttribute("data-xc-dock-key", item.key);
+    }
+    target.addEventListener("pointerdown", function (event) {
+      if (markDockEventHandled(event)) return;
+      if (typeof event.button === "number" && event.button !== 0) return;
+      stopDockInteractiveEvent(event, true);
+      target.__xcWalletDockSuppressClickUntil = Date.now() + 450;
+      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
+    }, true);
+    target.addEventListener("mousedown", function (event) {
+      if (markDockEventHandled(event)) return;
+      if (typeof event.button === "number" && event.button !== 0) return;
+      stopDockInteractiveEvent(event, true);
+      if (typeof window.PointerEvent !== "undefined") return;
+      target.__xcWalletDockSuppressClickUntil = Date.now() + 450;
+      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
+    }, true);
+    target.addEventListener("click", function (event) {
+      if (markDockEventHandled(event)) return;
+      stopDockInteractiveEvent(event, true);
+      if (target.__xcWalletDockSuppressClickUntil && target.__xcWalletDockSuppressClickUntil > Date.now()) return;
+      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
+    }, true);
+    target.addEventListener("keydown", function (event) {
+      if (!event || (event.key !== "Enter" && event.key !== " ")) return;
+      if (markDockEventHandled(event)) return;
+      stopDockInteractiveEvent(event, true);
+      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
+    }, true);
+    target.__xcWalletDockBound = true;
   }
 
   function renderSidebarDock(menuRoot, dockVisible) {
@@ -217,6 +293,11 @@
       return;
     }
     renderFloatingDock(dockVisible);
+  }
+
+  function onDocumentClick(event) {
+    if (dom.dock && event && event.target && dom.dock.contains(event.target)) return;
+    scheduleDockSync();
   }
 
   function scheduleDockSync() {
@@ -436,7 +517,24 @@
   }
 
   function shouldShowDock() {
-    return state.authed === true && !isAuthPath(state.route.path);
+    return (!!state.token || state.authed === true) && !isAuthPath(state.route.path);
+  }
+
+  function clearAuthProbe() {
+    if (authProbeTimer) {
+      clearTimeout(authProbeTimer);
+      authProbeTimer = 0;
+    }
+    authProbeAttempts = 0;
+  }
+
+  function scheduleAuthProbe() {
+    if (authProbeTimer || isAuthPath(state.route.path) || authProbeAttempts >= MAX_AUTH_PROBE_ATTEMPTS) return;
+    authProbeAttempts += 1;
+    authProbeTimer = setTimeout(function () {
+      authProbeTimer = 0;
+      load(false);
+    }, AUTH_PROBE_DELAY);
   }
 
   function badge(label, tone) {
@@ -580,15 +678,7 @@
   function onClick(event) {
     var btn = event.target.closest("[data-xc]");
     if (!btn) return;
-    var action = btn.dataset.xc;
-    if (action === "wallet") openWallet("");
-    if (action === "section") openWallet(btn.dataset.section || "");
-    if (action === "close") closeWallet();
-    if (action === "refresh") load(true);
-    if (action === "login") location.hash = "#/login";
-    if (action === "claim") claim();
-    if (action === "topup") createTopup();
-    if (action === "renew") toggleRenew(btn.dataset.enabled === "1");
+    runDockAction(btn.dataset.xc, btn.dataset.section, btn.dataset.enabled);
   }
 
   function layout(inner) {
@@ -778,8 +868,10 @@
       state.authed = false;
       state.user = null;
       state.loading = false;
+      scheduleAuthProbe();
       return render();
     }
+    clearAuthProbe();
     var shouldLoadWallet = state.route.isWallet || force;
     state.loading = shouldLoadWallet;
     render();
@@ -790,10 +882,12 @@
       state.authed = false;
       state.user = null;
       state.loading = false;
+      scheduleAuthProbe();
       return render();
     }
     state.authed = true;
     state.user = base.data;
+    clearAuthProbe();
     if (!shouldLoadWallet) {
       state.loading = false;
       return render();
@@ -856,7 +950,7 @@
       observer.observe(document.body, { childList: true, subtree: true });
     }
     addEventListener("resize", scheduleDockSync, { passive: true });
-    document.addEventListener("click", scheduleDockSync, true);
+    document.addEventListener("click", onDocumentClick, true);
     addEventListener("hashchange", sync);
     addEventListener("keydown", function (event) {
       if (event.key === "Escape" && state.route.isWallet) closeWallet();
