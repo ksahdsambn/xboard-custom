@@ -385,3 +385,45 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
 - `scripts/update-overlay-from-git.sh`
+
+### 2026-03-11 登录页语言面板半透明横跳修复
+
+#### 1. 问题现象
+
+- 在确认线上已经加载最终宽度修复版脚本后，登录页语言面板仍有用户反馈“滚动时跳到左侧、变成半透明、难以点击”的问题。
+- 该现象与前面的“宽度越滚越宽”不同，表现更像弹层在滚动交互期间触发了过渡动画。
+
+#### 2. 根因定位
+
+- 线上实测时，认证页语言 follower 虽然已经被重新定位为稳定的 `left / top / width`，但其计算样式仍然保留 `transition: all`。
+- 在桌面端滚轮或滚动条交互期间，`left / top / width / opacity` 一旦参与过渡，浏览器会把语言面板短暂显示成“移动中的半透明层”，用户视觉上就会看到：
+  - 弹层向左飘；
+  - 透明度变化；
+  - 像闪屏一样难以继续选择语言。
+
+#### 3. 修复方式
+
+- 继续修复 `theme/XboardCustom/assets/i18n-extra.js`
+- 为认证页语言面板相关节点强制关闭过渡与动画：
+  - `v-binder-follower-content`
+  - `n-base-select-menu`
+  - `n-base-select-menu-option-wrapper`
+- 同时在脚本中为 follower / panel / menu / view 直接写入：
+  - `transition: none`
+  - `animation: none`
+  - `opacity: 1`
+- 这样即使滚动期间继续执行定位同步，弹层也不会再以“半透明动画态”横向飘移。
+
+#### 4. 运行态回归
+
+- 使用 Playwright 将本地最新 `i18n-extra.js` 注入线上 `https://node.lokiflux.com/#/login` 进行回归。
+- 回归结果确认：
+  - 语言面板 `transition` 已变为 `none`；
+  - `opacity` 保持 `1`；
+  - 滚轮后 `left` 和 `width` 保持稳定；
+  - 仍可成功选择 `Suomi`，并正确写入 `VUE_NAIVE_LOCALE`。
+
+#### 5. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`

@@ -4592,10 +4592,19 @@
     var style = document.createElement('style');
     style.id = 'xc-auth-locale-style';
     style.textContent = ''
-      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_FOLLOWER_CLASS + '{z-index:3200;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_FOLLOWER_CLASS + '{'
+      + 'z-index:3200;'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
+      + 'opacity:1!important;'
+      + 'transform:none!important;'
+      + '}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_MENU_CLASS + '{'
       + 'max-height:min(70vh,calc(100vh - 24px));'
       + 'overflow:hidden;'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
+      + 'opacity:1!important;'
       + '}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + '{'
       + 'max-height:inherit;'
@@ -4604,12 +4613,16 @@
       + 'overscroll-behavior:contain;'
       + 'scrollbar-gutter:stable;'
       + '-webkit-overflow-scrolling:touch;'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
       + '}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + ' .n-scrollbar-container,'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_VIEW_CLASS + ' .n-scrollbar-content{'
       + 'max-height:inherit;'
       + 'overflow-y:auto;'
       + 'overflow-x:hidden;'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
       + '}';
     document.head.appendChild(style);
   }
@@ -4709,6 +4722,8 @@
       view.style.overflowX = '';
       view.style.overscrollBehavior = '';
       view.style.scrollbarGutter = '';
+      view.style.transition = '';
+      view.style.animation = '';
       view.__xcAuthLocaleStableWidth = 0;
     });
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_FOLLOWER_CLASS), function (follower) {
@@ -4725,6 +4740,9 @@
       follower.style.inset = '';
       follower.style.transform = '';
       follower.style.transformOrigin = '';
+      follower.style.transition = '';
+      follower.style.animation = '';
+      follower.style.opacity = '';
     });
   }
   function fitAuthLocaleDropdown(menu) {
@@ -4749,19 +4767,30 @@
     follower.style.margin = '0';
     follower.style.transform = 'none';
     follower.style.transformOrigin = 'center center';
+    follower.style.transition = 'none';
+    follower.style.animation = 'none';
+    follower.style.opacity = '1';
     follower.style.maxWidth = maxWidth + 'px';
     follower.style.maxHeight = maxHeight + 'px';
     panel.style.maxWidth = maxWidth + 'px';
     panel.style.maxHeight = maxHeight + 'px';
     panel.style.overflow = 'hidden';
     panel.style.transform = 'none';
+    panel.style.transition = 'none';
+    panel.style.animation = 'none';
+    panel.style.opacity = '1';
     panel.style.width = '';
     menu.style.width = '100%';
+    menu.style.transition = 'none';
+    menu.style.animation = 'none';
+    menu.style.opacity = '1';
     menuView.style.maxHeight = maxHeight + 'px';
     menuView.style.overflowY = 'auto';
     menuView.style.overflowX = 'hidden';
     menuView.style.overscrollBehavior = 'contain';
     menuView.style.scrollbarGutter = 'stable';
+    menuView.style.transition = 'none';
+    menuView.style.animation = 'none';
 
     requestAnimationFrame(function () {
       if (!menu.isConnected) return;
