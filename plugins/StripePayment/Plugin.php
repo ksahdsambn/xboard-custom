@@ -194,7 +194,7 @@ class Plugin extends AbstractPlugin implements PaymentInterface
     {
         $payload = [
             'mode' => 'payment',
-            'payment_method_types[0]' => 'card',
+            // Let Stripe use Dashboard-managed dynamic payment methods instead of forcing cards only.
             'success_url' => $context['return_url'],
             'cancel_url' => $context['return_url'],
             'client_reference_id' => $context['trade_no'],

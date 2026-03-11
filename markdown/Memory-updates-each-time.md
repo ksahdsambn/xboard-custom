@@ -758,3 +758,32 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `theme/XboardCustom/assets/wallet-center.css`
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 Stripe Checkout dynamic payment methods
+
+#### 1. Goal
+
+- A new Stripe checkout behavior issue had to be fixed:
+  - even after switching the site default currency and the Stripe payment instance currency to `EUR`, the frontend checkout still only exposed card entry (plus Link) instead of allowing Stripe-managed local payment methods such as Bancontact, EPS, iDEAL, or SEPA when eligible
+
+#### 2. Root Cause
+
+- The Stripe payment plugin was hard-coding the Checkout Session payload to `payment_method_types[0] = card`.
+- That forced Stripe Checkout into card-only mode from the API side, which overrides the broader payment-method configuration enabled in the Stripe Dashboard.
+
+#### 3. Fix
+
+- Updated `plugins/StripePayment/Plugin.php`.
+- Removed the hard-coded `payment_method_types[0] = card` field from `createCheckoutSession()`.
+- The plugin now lets Stripe determine eligible checkout payment methods dynamically from the Dashboard configuration, currency, customer eligibility, and Checkout runtime context.
+
+#### 4. Verification
+
+- Source-level verification confirmed the hard-coded `card` override is no longer present in `createCheckoutSession()`.
+- Local PHP lint could not be executed in this Codex desktop environment because `php` is not installed on the host shell.
+- A follow-up runtime verification is still required after deployment by opening a fresh Stripe Checkout Session and confirming whether Stripe now surfaces additional eligible methods for the current account and customer context.
+
+#### 5. Files
+
+- `plugins/StripePayment/Plugin.php`
+- `markdown/Memory-updates-each-time.md`
