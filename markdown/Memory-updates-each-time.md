@@ -346,6 +346,87 @@ FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/x
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
 
+### 2026-03-11 认证页语言选择器改为常驻展开列表
+
+#### 1. 需求调整
+
+- 继续收到认证页语言选择器闪屏反馈后，需求改为不再保留“点击按钮 -> 展开下拉”的交互。
+- 新要求是：在 `#/login` 等认证页中，语言列表直接展开显示所有语言，去掉滑动选择，效果参考登录后面板中“语言列表已经展开”的状态。
+
+#### 2. 最终实现
+
+- 停止在认证页使用任何原生 Naive UI 语言下拉交互。
+- 在 `theme/XboardCustom/assets/i18n-extra.js` 中：
+  - 识别认证页底部原生语言按钮；
+  - 直接隐藏原生按钮，禁止用户再触发原生下拉；
+  - 渲染一个常驻展开的自定义语言列表面板；
+  - 面板直接使用 `window.settings.i18n` 和现有 locale 名称映射生成全部语言项；
+  - 点击语言项后直接写入 `VUE_NAIVE_LOCALE` / `locale` / `lang`，然后刷新页面应用新语言；
+  - 同时强制隐藏可能已出现的原生 `n-base-select-menu / n-dropdown-menu`。
+
+#### 3. 布局策略
+
+- 桌面端：
+  - 认证页右上角固定显示单列完整语言列表；
+  - 不再需要点击展开；
+  - 不再存在下拉滚动容器。
+- 窄屏或较矮视口：
+  - 自动切换为双列固定列表；
+  - 仍然一次性显示全部语言；
+  - 不使用内部滚动，避免再次回到“滑动选择”的问题。
+
+#### 4. 运行态回归
+
+- 使用 Playwright 将本地最新 `i18n-extra.js` 注入线上 `https://node.lokiflux.com/#/login` 回归。
+- 桌面端回归确认：
+  - 原生语言按钮已隐藏；
+  - 自定义语言列表常驻显示；
+  - 原生 `n-base-select-menu` 不再可见；
+  - 可以直接点击 `Suomi`，并正确写入 `VUE_NAIVE_LOCALE` 与 `html lang`。
+- 窄屏回归确认：
+  - 自定义语言列表自动切换为双列；
+  - 仍为常驻展开状态；
+  - 原生下拉仍不可见。
+
+#### 5. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 认证页语言选择器替换为自定义固定面板
+
+#### 1. 最终结论
+
+- 多轮修复后继续闪屏的根本原因是：登录页原生语言选择器建立在 Naive UI 的 portal + follower + transition 机制之上。
+- 即使依次压制了 `n-base-select-menu`、`v-binder-follower-content`、`v-binder-follower-container` 的宽度与动画，认证页下的原生选择器仍然存在被组件内部重新接管的风险。
+- 继续在 follower 链路上打补丁，属于“追症状”，稳定性不足。
+
+#### 2. 最终修复方式
+
+- 停止在认证页继续使用原生语言下拉弹层。
+- 在 `theme/XboardCustom/assets/i18n-extra.js` 中：
+  - 拦截认证页底部原生语言按钮的 `pointerdown / mousedown / click`；
+  - 阻止 Naive UI 原生语言弹层打开；
+  - 改为挂载一个自定义固定定位语言面板；
+  - 面板直接使用 `window.settings.i18n` 与现有 locale 名称映射渲染；
+  - 选择语言后直接写入 `VUE_NAIVE_LOCALE`，同步 `locale/lang`，然后刷新页面应用新语言。
+- 同时如果原生 follower 已经出现，则在认证页下强制隐藏对应原生语言弹层，避免和自定义面板并存。
+
+#### 3. 运行态回归
+
+- 使用 Playwright 将本地最新 `i18n-extra.js` 注入线上登录页 `https://node.lokiflux.com/#/login` 回归。
+- 回归结果确认：
+  - 点击语言按钮后打开的是自定义固定面板；
+  - 原生 `n-base-select-menu` 不再可见；
+  - 自定义面板滚轮滚动正常，`scrollTop` 正常变化；
+  - 面板 `transition: none`、`opacity: 1`；
+  - 可成功选择 `Suomi`，并正确写入 `VUE_NAIVE_LOCALE` 与 `html lang`。
+
+#### 4. 本次涉及文件
+
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `markdown/Memory-updates-each-time.md`
+
 ### 2026-03-11 登录页语言面板外层 follower 容器动画修复
 
 #### 1. 问题现象

@@ -4506,10 +4506,16 @@
   var AUTH_LOCALE_VIEW_CLASS = 'xc-auth-locale-menu-view';
   var AUTH_LOCALE_FOLLOWER_CLASS = 'xc-auth-locale-follower';
   var AUTH_LOCALE_CONTAINER_CLASS = 'xc-auth-locale-container';
+  var AUTH_CUSTOM_PANEL_CLASS = 'xc-auth-locale-custom-panel';
+  var AUTH_CUSTOM_OPTION_CLASS = 'xc-auth-locale-custom-option';
+  var AUTH_CUSTOM_OPTION_ACTIVE_CLASS = 'xc-auth-locale-custom-option-active';
+  var AUTH_CUSTOM_TRIGGER_CLASS = 'xc-auth-locale-custom-trigger';
   var AUTH_PAGE_CLASS = 'xc-auth-page';
   var authLocaleLayoutFrame = 0;
   var authLocaleObserver = null;
   var authLocaleScrollbarWidth = 0;
+  var authCustomLocalePanel = null;
+  var authCustomLocaleVisible = false;
   var knownLocaleLabels = buildKnownLocaleLabels();
 
   function buildKnownLocaleLabels() {
@@ -4529,6 +4535,32 @@
       return label && list.indexOf(label) === index;
     });
   }
+  function buildSupportedLocales() {
+    var configured = (window.settings && window.settings.i18n) || [];
+    var names = {
+      'zh-CN': '简体中文',
+      'zh-TW': '繁體中文',
+      'en-US': 'English',
+      'ja-JP': '日本語',
+      'vi-VN': 'Tiếng Việt',
+      'ko-KR': '한국어',
+      'fa-IR': 'Iran'
+    };
+    Object.keys(payload.names || {}).forEach(function (key) {
+      names[key] = payload.names[key];
+    });
+    return configured.map(function (locale) {
+      return {
+        value: locale,
+        label: names[locale] || locale
+      };
+    }).filter(function (entry, index, list) {
+      return entry.value && list.findIndex(function (item) {
+        return item.value === entry.value;
+      }) === index;
+    });
+  }
+  var supportedLocales = buildSupportedLocales();
   function readStoredLocale() {
     var raw = localStorage.getItem('VUE_NAIVE_LOCALE');
     if (!raw) return null;
@@ -4538,6 +4570,51 @@
     } catch (error) {
       return null;
     }
+  }
+  function normalizeSupportedLocale(raw) {
+    if (!raw) return 'zh-CN';
+    var lower = String(raw).toLowerCase();
+    var exact = supportedLocales.find(function (entry) {
+      return entry.value.toLowerCase() === lower;
+    });
+    if (exact) return exact.value;
+    var language = lower.split('-')[0];
+    exact = supportedLocales.find(function (entry) {
+      return entry.value.toLowerCase().split('-')[0] === language;
+    });
+    return exact ? exact.value : 'zh-CN';
+  }
+  function getCurrentLocaleEntry() {
+    var locale = normalizeSupportedLocale(readStoredLocale() || document.documentElement.lang || navigator.language || 'zh-CN');
+    return supportedLocales.find(function (entry) {
+      return entry.value === locale;
+    }) || supportedLocales[0] || { value: 'zh-CN', label: '简体中文' };
+  }
+  function writeStoredLocale(locale) {
+    var value = normalizeSupportedLocale(locale);
+    var payloadValue = JSON.stringify({
+      value: value,
+      time: Date.now(),
+      expire: null
+    });
+    localStorage.setItem('VUE_NAIVE_LOCALE', payloadValue);
+    localStorage.setItem('locale', value);
+    localStorage.setItem('lang', value);
+    return value;
+  }
+  function getAuthPanelColumns() {
+    return window.innerWidth <= 720 || window.innerHeight < 820 ? 2 : 1;
+  }
+  function getExpandedAuthLocalePanelWidth(panel, columns) {
+    if (!panel) return 220;
+    var width = 220;
+    Array.prototype.forEach.call(panel.querySelectorAll('.' + AUTH_CUSTOM_OPTION_CLASS), function (option) {
+      width = Math.max(width, option.scrollWidth + 24);
+    });
+    if (columns > 1) {
+      return Math.min(window.innerWidth - 24, Math.max(280, width * columns + 12));
+    }
+    return Math.min(window.innerWidth - 32, Math.min(320, width + 16));
   }
   function readCurrentHashPath() {
     var raw = String(window.location.hash || '').replace(/^#/, '');
@@ -4606,6 +4683,42 @@
       + 'opacity:1!important;'
       + 'transform:none!important;'
       + '}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_TRIGGER_CLASS + '{position:relative;z-index:3201;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '{'
+      + 'position:fixed;'
+      + 'z-index:3202;'
+      + 'display:none;'
+      + 'min-width:220px;'
+      + 'max-width:min(96vw,360px);'
+      + 'overflow:visible;'
+      + 'padding:4px 0;'
+      + 'border-radius:3px;'
+      + 'background:#fff;'
+      + 'box-shadow:0 3px 6px -4px rgba(0, 0, 0, .12), 0 6px 16px 0 rgba(0, 0, 0, .08), 0 9px 28px 8px rgba(0, 0, 0, .05);'
+      + 'pointer-events:auto;'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
+      + 'opacity:1!important;'
+      + 'transform:none!important;'
+      + '}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-open=\"true\"]{display:block;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-columns=\"1\"]{grid-template-columns:1fr;gap:0;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_PANEL_CLASS + '[data-columns=\"2\"]{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:8px;}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_OPTION_CLASS + '{'
+      + 'display:flex;'
+      + 'align-items:center;'
+      + 'padding:0 12px;'
+      + 'height:34px;'
+      + 'font-size:14px;'
+      + 'color:rgb(51, 54, 57);'
+      + 'cursor:pointer;'
+      + 'user-select:none;'
+      + 'white-space:nowrap;'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
+      + '}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_OPTION_CLASS + ':hover{background:rgb(243, 243, 245);}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_CUSTOM_OPTION_ACTIVE_CLASS + '{color:#316C72FF;font-weight:500;}'
       + 'body.' + AUTH_PAGE_CLASS + ' .' + AUTH_LOCALE_MENU_CLASS + '{'
       + 'max-height:min(70vh,calc(100vh - 24px));'
       + 'overflow:hidden;'
@@ -4628,6 +4741,11 @@
       + 'max-height:inherit;'
       + 'overflow-y:auto;'
       + 'overflow-x:hidden;'
+      + 'transition:none!important;'
+      + 'animation:none!important;'
+      + '}'
+      + 'body.' + AUTH_PAGE_CLASS + ' .v-binder-follower-container .n-base-select-menu,'
+      + 'body.' + AUTH_PAGE_CLASS + ' .v-binder-follower-container .n-dropdown-menu{'
       + 'transition:none!important;'
       + 'animation:none!important;'
       + '}';
@@ -4687,6 +4805,131 @@
     });
     return buttons[0];
   }
+  function ensureAuthCustomLocalePanel() {
+    if (authCustomLocalePanel && authCustomLocalePanel.isConnected) return authCustomLocalePanel;
+    if (!document.body) return null;
+    var panel = document.createElement('div');
+    panel.className = AUTH_CUSTOM_PANEL_CLASS;
+    panel.setAttribute('data-open', 'false');
+    panel.setAttribute('data-columns', '1');
+    panel.addEventListener('click', function (event) {
+      event.stopPropagation();
+    });
+    panel.addEventListener('mousedown', function (event) {
+      event.stopPropagation();
+    });
+    panel.addEventListener('pointerdown', function (event) {
+      event.stopPropagation();
+    });
+    panel.addEventListener('wheel', function (event) {
+      event.stopPropagation();
+    }, { passive: true });
+    document.body.appendChild(panel);
+    authCustomLocalePanel = panel;
+    return panel;
+  }
+  function renderAuthCustomLocalePanel() {
+    var panel = ensureAuthCustomLocalePanel();
+    if (!panel) return null;
+    var current = getCurrentLocaleEntry().value;
+    panel.innerHTML = '';
+    supportedLocales.forEach(function (entry) {
+      var option = document.createElement('div');
+      option.className = AUTH_CUSTOM_OPTION_CLASS + (entry.value === current ? ' ' + AUTH_CUSTOM_OPTION_ACTIVE_CLASS : '');
+      option.textContent = entry.label;
+      option.setAttribute('data-locale', entry.value);
+      option.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var nextLocale = writeStoredLocale(entry.value);
+        applyLocaleDirection(nextLocale);
+        hideAuthCustomLocalePanel();
+        window.location.reload();
+      });
+      panel.appendChild(option);
+    });
+    return panel;
+  }
+  function hideNativeAuthLocaleDropdowns() {
+    Array.prototype.forEach.call(document.querySelectorAll('.v-binder-follower-container .n-base-select-menu, .v-binder-follower-container .n-dropdown-menu'), function (menu) {
+      if (isLocaleDropdown(menu)) {
+        var container = getLocaleContainer(menu);
+        var follower = getLocaleFollower(menu);
+        if (container) {
+          container.style.display = 'none';
+        }
+        if (follower) {
+          follower.style.display = 'none';
+        }
+      }
+    });
+  }
+  function positionAuthCustomLocalePanel(trigger) {
+    var panel = ensureAuthCustomLocalePanel();
+    if (!panel) return;
+    var margin = window.innerWidth <= 720 ? 12 : 16;
+    var columns = getAuthPanelColumns();
+    panel.style.display = 'grid';
+    panel.setAttribute('data-open', 'true');
+    panel.setAttribute('data-columns', String(columns));
+    panel.style.position = 'fixed';
+    panel.style.top = margin + 'px';
+    panel.style.bottom = 'auto';
+    panel.style.maxHeight = 'none';
+    panel.style.overflow = 'visible';
+    panel.style.gridTemplateColumns = columns === 1 ? '1fr' : 'repeat(2,minmax(0,1fr))';
+    panel.style.gap = columns === 1 ? '0' : '4px';
+    panel.style.padding = columns === 1 ? '4px 0' : '8px';
+    var width = getExpandedAuthLocalePanelWidth(panel, columns);
+    if (columns === 1) {
+      panel.style.left = 'auto';
+      panel.style.right = margin + 'px';
+      panel.style.width = Math.round(width) + 'px';
+      return;
+    }
+    panel.style.left = margin + 'px';
+    panel.style.right = margin + 'px';
+    panel.style.width = 'auto';
+  }
+  function showAuthCustomLocalePanel() {
+    if (!document.body || !document.body.classList.contains(AUTH_PAGE_CLASS)) return;
+    renderAuthCustomLocalePanel();
+    positionAuthCustomLocalePanel();
+    authCustomLocaleVisible = true;
+    hideNativeAuthLocaleDropdowns();
+  }
+  function hideAuthCustomLocalePanel() {
+    if (!authCustomLocalePanel) return;
+    authCustomLocalePanel.setAttribute('data-open', 'false');
+    authCustomLocalePanel.style.display = 'none';
+    authCustomLocaleVisible = false;
+  }
+  function hideAuthLocaleTrigger(trigger) {
+    if (!trigger) return;
+    trigger.classList.add(AUTH_CUSTOM_TRIGGER_CLASS);
+    trigger.style.display = 'none';
+    trigger.style.pointerEvents = 'none';
+    trigger.setAttribute('tabindex', '-1');
+    trigger.setAttribute('aria-hidden', 'true');
+  }
+  function restoreAuthLocaleTrigger() {
+    Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_CUSTOM_TRIGGER_CLASS), function (trigger) {
+      trigger.classList.remove(AUTH_CUSTOM_TRIGGER_CLASS);
+      trigger.style.display = '';
+      trigger.style.pointerEvents = '';
+      trigger.removeAttribute('tabindex');
+      trigger.removeAttribute('aria-hidden');
+    });
+  }
+  function ensureAuthExpandedLocaleList() {
+    if (!document.body || !document.body.classList.contains(AUTH_PAGE_CLASS)) return false;
+    var trigger = getAuthLocaleTrigger();
+    if (trigger) {
+      hideAuthLocaleTrigger(trigger);
+    }
+    showAuthCustomLocalePanel();
+    return !!authCustomLocalePanel;
+  }
   function bindAuthLocaleInteractionGuards(menuView) {
     if (!menuView || menuView.__xcAuthLocaleInteractionBound) return;
     var syncLater = function () {
@@ -4721,6 +4964,8 @@
   }
   function clearAuthLocaleLayout() {
     if (!document.body) return;
+    hideAuthCustomLocalePanel();
+    restoreAuthLocaleTrigger();
     Array.prototype.forEach.call(document.querySelectorAll('.' + AUTH_LOCALE_CONTAINER_CLASS), function (container) {
       container.classList.remove(AUTH_LOCALE_CONTAINER_CLASS);
       container.style.position = '';
@@ -4892,6 +5137,10 @@
       return;
     }
     ensureAuthLocaleStyles();
+    if (ensureAuthExpandedLocaleList()) {
+      hideNativeAuthLocaleDropdowns();
+      return;
+    }
     Array.prototype.forEach.call(document.querySelectorAll(
       '.v-binder-follower-content .n-base-select-menu, '
       + '.v-binder-follower-container .n-base-select-menu, '
