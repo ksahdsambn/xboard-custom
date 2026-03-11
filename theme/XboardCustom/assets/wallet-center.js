@@ -25,6 +25,224 @@
     renew: {}
   };
   var dom = {};
+  var dockSyncFrame = 0;
+
+  function dockItems() {
+    return [
+      { key: "wallet", action: "wallet", label: t("wallet") },
+      { key: "checkin", action: "section", section: "checkin", label: t("checkin") },
+      { key: "topup", action: "section", section: "topup", label: t("topup") },
+      { key: "renew", action: "section", section: "renew", label: t("renew") }
+    ];
+  }
+
+  function createDockIconMarkup(key) {
+    if (key === "wallet") {
+      return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.75 6.25A2.5 2.5 0 0 1 6.25 3.75h8.125A1.875 1.875 0 0 1 16.25 5.625V7.5h-2.5a3.125 3.125 0 0 0 0 6.25h2.5v.625a1.875 1.875 0 0 1-1.875 1.875H6.25a2.5 2.5 0 0 1-2.5-2.5v-7.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.75 8.75h2.5A1.25 1.25 0 0 1 17.5 10v1.25a1.25 1.25 0 0 1-1.25 1.25h-2.5A1.25 1.25 0 0 1 12.5 11.25V10a1.25 1.25 0 0 1 1.25-1.25Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.75 10.625h.625" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    }
+    if (key === "checkin") {
+      return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.25 2.917v2.5M13.75 2.917v2.5M4.583 7.083h10.834" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3.75" y="4.583" width="12.5" height="11.667" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="m7.5 10 1.667 1.667 3.333-3.334" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+    if (key === "topup") {
+      return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3.333v13.334M5.833 7.5 10 3.333 14.167 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.167 12.5v1.667a2.5 2.5 0 0 0 2.5 2.5h6.666a2.5 2.5 0 0 0 2.5-2.5V12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    }
+    return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M15.102 7.083A5.833 5.833 0 1 0 15.833 10h-2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.833 4.583v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  function getDockActiveKey() {
+    if (!state.route.isWallet) return "";
+    if (state.route.section === "checkin" || state.route.section === "topup" || state.route.section === "renew") {
+      return state.route.section;
+    }
+    return "wallet";
+  }
+
+  function isElementVisible(el) {
+    if (!el || !el.isConnected) return false;
+    var rect = el.getBoundingClientRect();
+    var style = window.getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+  }
+
+  function getSidebarMenuRoot() {
+    var menus = Array.prototype.filter.call(
+      document.querySelectorAll(".n-layout-sider .n-menu, .n-drawer .n-menu"),
+      function (menu) {
+        return isElementVisible(menu) && !!menu.querySelector(".n-menu-item");
+      }
+    );
+    if (!menus.length) return null;
+    menus.sort(function (a, b) {
+      return b.getBoundingClientRect().height - a.getBoundingClientRect().height;
+    });
+    return menus[0];
+  }
+
+  function isSidebarCollapsed(menuRoot) {
+    var sider = menuRoot && menuRoot.closest(".n-layout-sider, .n-drawer");
+    if (sider && sider.classList.contains("n-layout-sider--collapsed")) return true;
+    var rect = menuRoot ? menuRoot.getBoundingClientRect() : null;
+    return !!(rect && rect.width > 0 && rect.width < 120);
+  }
+
+  function stripNodeIds(node) {
+    if (!node || node.nodeType !== 1) return;
+    node.removeAttribute("id");
+    Array.prototype.forEach.call(node.querySelectorAll("[id]"), function (el) {
+      el.removeAttribute("id");
+    });
+  }
+
+  function createFallbackSidebarItem(item, active, collapsed) {
+    var node = document.createElement("div");
+    node.className = "n-menu-item xc-wallet-dock__item";
+    node.setAttribute("role", "menuitem");
+    var content = document.createElement("div");
+    content.className = "n-menu-item-content" + (active ? " n-menu-item-content--selected" : "") + (collapsed ? " n-menu-item-content--collapsed" : "");
+    content.setAttribute("data-xc", item.action);
+    if (item.section) content.setAttribute("data-section", item.section);
+    content.setAttribute("data-xc-dock-key", item.key);
+    content.setAttribute("tabindex", "0");
+    content.setAttribute("role", "button");
+    content.setAttribute("title", item.label);
+    var icon = document.createElement("div");
+    icon.className = "n-menu-item-content__icon xc-wallet-dock__icon";
+    icon.innerHTML = createDockIconMarkup(item.key);
+    var header = document.createElement("div");
+    header.className = "n-menu-item-content-header";
+    header.textContent = item.label;
+    content.appendChild(icon);
+    content.appendChild(header);
+    node.appendChild(content);
+    return node;
+  }
+
+  function buildSidebarDockItem(sampleItem, item, active, collapsed) {
+    if (!sampleItem) return createFallbackSidebarItem(item, active, collapsed);
+    var node = sampleItem.cloneNode(true);
+    stripNodeIds(node);
+    node.classList.add("xc-wallet-dock__item");
+    var content = node.querySelector(".n-menu-item-content") || node;
+    var icon = content.querySelector(".n-menu-item-content__icon");
+    var header = content.querySelector(".n-menu-item-content-header");
+    var extra = content.querySelector(".n-menu-item-content-header__extra");
+    var arrow = content.querySelector(".n-menu-item-content__arrow");
+    if (!icon) {
+      icon = document.createElement("div");
+      icon.className = "n-menu-item-content__icon xc-wallet-dock__icon";
+      content.insertBefore(icon, content.firstChild || null);
+    }
+    if (!header) {
+      header = document.createElement("div");
+      header.className = "n-menu-item-content-header";
+      content.appendChild(header);
+    }
+    if (extra) extra.remove();
+    if (arrow) arrow.remove();
+    icon.classList.add("xc-wallet-dock__icon");
+    icon.innerHTML = createDockIconMarkup(item.key);
+    header.textContent = item.label;
+    content.classList.toggle("n-menu-item-content--selected", !!active);
+    content.classList.toggle("n-menu-item-content--collapsed", !!collapsed);
+    content.classList.remove("n-menu-item-content--disabled");
+    content.classList.remove("n-menu-item-content--child-active");
+    content.classList.remove("n-menu-item-content--hover");
+    content.setAttribute("data-xc", item.action);
+    content.setAttribute("data-xc-dock-key", item.key);
+    content.setAttribute("role", "button");
+    content.setAttribute("tabindex", "0");
+    content.setAttribute("title", item.label);
+    if (item.section) {
+      content.setAttribute("data-section", item.section);
+    } else {
+      content.removeAttribute("data-section");
+    }
+    return node;
+  }
+
+  function renderSidebarDock(menuRoot, dockVisible) {
+    var sampleItem = menuRoot.querySelector(".n-menu-item");
+    var sampleTitle = menuRoot.querySelector(".n-menu-item-group-title");
+    var activeKey = getDockActiveKey();
+    var collapsed = isSidebarCollapsed(menuRoot);
+    dom.dock.className = "xc-wallet-dock xc-wallet-dock--sidebar";
+    dom.dock.hidden = !dockVisible;
+    dom.dock.dataset.visible = dockVisible ? "true" : "false";
+    dom.dock.dataset.collapsed = collapsed ? "true" : "false";
+    dom.dock.innerHTML = "";
+    dom.dock.setAttribute("role", "group");
+    var title = sampleTitle ? sampleTitle.cloneNode(false) : document.createElement("div");
+    title.className = sampleTitle ? sampleTitle.className : "n-menu-item-group-title";
+    title.textContent = t("title");
+    var list = document.createElement("div");
+    list.className = "xc-wallet-dock__items";
+    dockItems().forEach(function (item) {
+      list.appendChild(buildSidebarDockItem(sampleItem, item, item.key === activeKey, collapsed));
+    });
+    dom.dock.appendChild(title);
+    dom.dock.appendChild(list);
+    if (dom.dock.parentElement !== menuRoot) {
+      menuRoot.appendChild(dom.dock);
+    }
+  }
+
+  function floatingDockHtml() {
+    return ''
+      + '<button type="button" data-xc="wallet" data-variant="primary">' + esc(t("wallet")) + "</button>"
+      + '<button type="button" data-xc="section" data-section="checkin">' + esc(t("checkin")) + "</button>"
+      + '<button type="button" data-xc="section" data-section="topup">' + esc(t("topup")) + "</button>"
+      + '<button type="button" data-xc="section" data-section="renew">' + esc(t("renew")) + "</button>";
+  }
+
+  function renderFloatingDock(dockVisible) {
+    dom.dock.className = "xc-wallet-dock xc-wallet-dock--floating";
+    dom.dock.hidden = !dockVisible;
+    dom.dock.dataset.visible = dockVisible ? "true" : "false";
+    dom.dock.removeAttribute("data-collapsed");
+    dom.dock.innerHTML = dockVisible ? floatingDockHtml() : "";
+    if (dom.dock.parentElement !== document.body) {
+      document.body.appendChild(dom.dock);
+    }
+  }
+
+  function renderDock() {
+    var dockVisible = shouldShowDock();
+    var menuRoot = dockVisible ? getSidebarMenuRoot() : null;
+    if (menuRoot) {
+      renderSidebarDock(menuRoot, dockVisible);
+      return;
+    }
+    if (dockVisible && window.innerWidth > 720) {
+      renderFloatingDock(false);
+      return;
+    }
+    renderFloatingDock(dockVisible);
+  }
+
+  function scheduleDockSync() {
+    if (dockSyncFrame) cancelAnimationFrame(dockSyncFrame);
+    dockSyncFrame = requestAnimationFrame(function () {
+      dockSyncFrame = 0;
+      if (!dom.dock) return;
+      renderDock();
+    });
+  }
+
+  function shouldRefreshDock(records) {
+    if (!records || !records.length) return false;
+    return records.some(function (record) {
+      var nodes = [];
+      if (record.target) nodes.push(record.target);
+      Array.prototype.push.apply(nodes, Array.prototype.slice.call(record.addedNodes || []));
+      Array.prototype.push.apply(nodes, Array.prototype.slice.call(record.removedNodes || []));
+      return nodes.some(function (node) {
+        if (!node || node.nodeType !== 1) return false;
+        if (dom.dock && (node === dom.dock || dom.dock.contains(node))) return false;
+        return (node.matches && node.matches(".n-layout-sider, .n-layout-sider-scroll-container, .n-menu, .n-drawer, .n-menu-item, .n-menu-item-group-title"))
+          || (node.querySelector && node.querySelector(".n-layout-sider, .n-layout-sider-scroll-container, .n-menu, .n-drawer, .n-menu-item, .n-menu-item-group-title"));
+      });
+    });
+  }
 
   function buildTextCatalog() {
     var base = {
@@ -335,8 +553,9 @@
   function ensure() {
     if (dom.dock) return;
     dom.dock = document.createElement("div");
-    dom.dock.className = "xc-wallet-dock";
+    dom.dock.className = "xc-wallet-dock xc-wallet-dock--floating";
     dom.dock.addEventListener("click", onClick);
+    dom.dock.addEventListener("keydown", onDockKeydown);
     dom.overlay = document.createElement("div");
     dom.overlay.className = "xc-wallet-overlay";
     dom.overlay.addEventListener("click", onClick);
@@ -348,6 +567,14 @@
     document.body.appendChild(dom.dock);
     document.body.appendChild(dom.overlay);
     document.body.appendChild(dom.toast);
+  }
+
+  function onDockKeydown(event) {
+    if (!event || (event.key !== "Enter" && event.key !== " ")) return;
+    var target = event.target.closest("[data-xc]");
+    if (!target) return;
+    event.preventDefault();
+    target.click();
   }
 
   function onClick(event) {
@@ -362,14 +589,6 @@
     if (action === "claim") claim();
     if (action === "topup") createTopup();
     if (action === "renew") toggleRenew(btn.dataset.enabled === "1");
-  }
-
-  function dockHtml() {
-    return ''
-      + '<button type="button" data-xc="wallet" data-variant="primary">' + esc(t("wallet")) + "</button>"
-      + '<button type="button" data-xc="section" data-section="checkin">' + esc(t("checkin")) + "</button>"
-      + '<button type="button" data-xc="section" data-section="topup">' + esc(t("topup")) + "</button>"
-      + '<button type="button" data-xc="section" data-section="renew">' + esc(t("renew")) + "</button>";
   }
 
   function layout(inner) {
@@ -409,10 +628,7 @@
   function render() {
     ensure();
     applyLocaleDirection(state.locale);
-    var dockVisible = shouldShowDock();
-    dom.dock.hidden = !dockVisible;
-    dom.dock.dataset.visible = dockVisible ? "true" : "false";
-    dom.dock.innerHTML = dockVisible ? dockHtml() : "";
+    renderDock();
     dom.overlay.dataset.open = state.route.isWallet ? "true" : "false";
     dom.overlay.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
     dom.overlay.dataset.locale = intlLocale();
@@ -631,6 +847,16 @@
   function init() {
     ensure();
     load(false);
+    if (document.body) {
+      var observer = new MutationObserver(function (records) {
+        if (shouldRefreshDock(records)) {
+          scheduleDockSync();
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+    addEventListener("resize", scheduleDockSync, { passive: true });
+    document.addEventListener("click", scheduleDockSync, true);
     addEventListener("hashchange", sync);
     addEventListener("keydown", function (event) {
       if (event.key === "Escape" && state.route.isWallet) closeWallet();

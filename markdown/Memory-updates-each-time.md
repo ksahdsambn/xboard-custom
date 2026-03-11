@@ -621,3 +621,56 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `theme/XboardCustom/assets/wallet-center.js`
 - `theme/XboardCustom/assets/i18n-extra.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-11 WalletCenter sidebar menu integration
+
+#### 1. Goal
+
+- The original WalletCenter quick-entry used a floating dock fixed to the bottom-right corner.
+- The UI was changed to integrate WalletCenter into the left sidebar below the existing navigation, with vertical order:
+  - 钱包
+  - 签到
+  - 充值
+  - 自动续费
+- The target was not just moving position, but visually matching the native sidebar menu with icons, selected highlight, group title, and collapsed-state behavior.
+
+#### 2. Implementation
+
+- Updated `theme/XboardCustom/assets/wallet-center.js`.
+- Replaced the old fixed dock-first rendering path with a two-mode dock renderer:
+  - sidebar-injected mode on desktop when a visible `n-layout-sider .n-menu` exists
+  - floating fallback mode only when no sidebar menu is available, mainly as a narrow-screen fallback
+- The sidebar mode now:
+  - finds the visible Naive UI sidebar menu root
+  - injects a custom WalletCenter group into the existing `.n-menu`
+  - renders four vertical menu items with custom SVG icons
+  - tracks active route/section to apply selected-state highlight
+  - detects collapsed sidebar state and mirrors collapsed item behavior
+- Added dock remount/sync logic for route changes, sidebar DOM updates, click-triggered menu changes, and window resize.
+
+#### 3. Styling
+
+- Updated `theme/XboardCustom/assets/wallet-center.css`.
+- Scoped the original floating appearance to `.xc-wallet-dock--floating`.
+- Added `.xc-wallet-dock--sidebar` styles for:
+  - sidebar group spacing
+  - native-like item block layout
+  - icon rendering
+  - collapsed-state title hiding
+- This avoids the old fixed-position styles leaking into the injected sidebar version.
+
+#### 4. Verification
+
+- `node --check theme/XboardCustom/assets/wallet-center.js`
+- Playwright mock-layout regression with a fake `n-layout-sider > .n-menu` DOM confirmed:
+  - the WalletCenter group is injected inside the sidebar menu root
+  - the items render in the required vertical order
+  - the floating dock stays hidden when sidebar mode is available
+  - wallet route `section=renew` marks the renew item as selected
+  - collapsed sidebar state marks all four custom items as collapsed
+
+#### 5. Files
+
+- `theme/XboardCustom/assets/wallet-center.js`
+- `theme/XboardCustom/assets/wallet-center.css`
+- `markdown/Memory-updates-each-time.md`
