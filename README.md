@@ -1,3 +1,3 @@
 # xboard-custom
 
-xboard-custom plugins&theme
+xboard-custom plugins&theme.
