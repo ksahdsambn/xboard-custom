@@ -787,3 +787,53 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 - `plugins/StripePayment/Plugin.php`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-03-15 iOS dashboard cold-start race and auth-page cleanup
+
+#### 1. Problem
+
+- On iOS Safari and iOS Chrome, opening an already-authenticated `#/dashboard` session could still hit a cold-start race:
+  - the floating WalletCenter dock could paint before the dashboard shell was ready
+  - sidebar re-sync could rebuild the dock during interaction
+  - first-login redirect flows could leave `body.xc-auth-page` behind on dashboard
+
+#### 2. Fix
+
+- Updated `theme/XboardCustom/assets/wallet-center.js`.
+- Split WalletCenter runtime host creation into:
+  - dock host
+  - wallet overlay shell
+  - toast host
+- Non-wallet cold start no longer appends the overlay or toast containers to `body`.
+- Tightened dock display policy:
+  - mobile non-wallet routes now keep the floating dock hidden while probing for a real sidebar target
+  - desktop dock probing now waits for app-shell readiness before using the sidebar-first retry path
+- Removed sidebar dock pointer interception:
+  - deleted capture-phase `pointerdown` / `mousedown` / `click` handling from injected sidebar entries
+  - kept keyboard activation only on the custom sidebar target
+- Reduced self-triggered remount churn:
+  - dock sync is now single-frame coalesced
+  - dock-owned mutation records are ignored
+  - identical parent/mode/signature combinations no longer rebuild the dock DOM
+- Updated `theme/XboardCustom/assets/i18n-extra.js`.
+- Added bounded `scheduleAuthPageStateSync()` with:
+  - immediate sync
+  - two `requestAnimationFrame` corrections
+  - one short timeout correction
+- Non-auth routes now immediately remove `body.xc-auth-page` and clear auth-locale custom panel / follower layout leftovers.
+- Updated `theme/XboardCustom/assets/wallet-center.css`.
+- Added a mobile fallback rule that hides `.xc-wallet-dock--floating` unless runtime explicitly allows floating mode.
+
+#### 3. Verification
+
+- `node --check theme/XboardCustom/assets/wallet-center.js`
+- `node --check theme/XboardCustom/assets/i18n-extra.js`
+- `node --test tests/runtime-regression.test.js`
+
+#### 4. Files
+
+- `theme/XboardCustom/assets/wallet-center.js`
+- `theme/XboardCustom/assets/i18n-extra.js`
+- `theme/XboardCustom/assets/wallet-center.css`
+- `tests/runtime-regression.test.js`
+- `markdown/Memory-updates-each-time.md`

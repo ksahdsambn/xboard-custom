@@ -34,6 +34,11 @@
   var dockProbeAttempts = 0;
   var MAX_DOCK_PROBE_ATTEMPTS = 20;
   var DOCK_PROBE_DELAY = 450;
+  var dockRenderState = {
+    mode: "",
+    parent: null,
+    signature: ""
+  };
 
   function dockItems() {
     return [
@@ -122,7 +127,6 @@
     content.appendChild(icon);
     content.appendChild(header);
     node.appendChild(content);
-    bindDockInteractiveTarget(node, item);
     bindDockInteractiveTarget(content, item);
     bindDockHoverState(node, content);
     return node;
@@ -168,7 +172,6 @@
     } else {
       content.removeAttribute("data-section");
     }
-    bindDockInteractiveTarget(node, item);
     bindDockInteractiveTarget(content, item);
     bindDockHoverState(node, content);
     return node;
@@ -209,22 +212,6 @@
     });
   }
 
-  function markDockEventHandled(event) {
-    if (!event) return false;
-    if (event.__xcWalletDockHandled) return true;
-    event.__xcWalletDockHandled = true;
-    return false;
-  }
-
-  function stopDockInteractiveEvent(event, preventDefault) {
-    if (!event) return;
-    if (preventDefault) event.preventDefault();
-    if (typeof event.stopImmediatePropagation === "function") {
-      event.stopImmediatePropagation();
-    }
-    event.stopPropagation();
-  }
-
   function runDockAction(action, section, enabled) {
     if (action === "wallet") openWallet("");
     if (action === "section") openWallet(section || "");
@@ -247,33 +234,11 @@
       }
       target.setAttribute("data-xc-dock-key", item.key);
     }
-    target.addEventListener("pointerdown", function (event) {
-      if (markDockEventHandled(event)) return;
-      if (typeof event.button === "number" && event.button !== 0) return;
-      stopDockInteractiveEvent(event, true);
-      target.__xcWalletDockSuppressClickUntil = Date.now() + 450;
-      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
-    }, true);
-    target.addEventListener("mousedown", function (event) {
-      if (markDockEventHandled(event)) return;
-      if (typeof event.button === "number" && event.button !== 0) return;
-      stopDockInteractiveEvent(event, true);
-      if (typeof window.PointerEvent !== "undefined") return;
-      target.__xcWalletDockSuppressClickUntil = Date.now() + 450;
-      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
-    }, true);
-    target.addEventListener("click", function (event) {
-      if (markDockEventHandled(event)) return;
-      stopDockInteractiveEvent(event, true);
-      if (target.__xcWalletDockSuppressClickUntil && target.__xcWalletDockSuppressClickUntil > Date.now()) return;
-      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
-    }, true);
     target.addEventListener("keydown", function (event) {
       if (!event || (event.key !== "Enter" && event.key !== " ")) return;
-      if (markDockEventHandled(event)) return;
-      stopDockInteractiveEvent(event, true);
+      event.preventDefault();
       runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
-    }, true);
+    });
     target.__xcWalletDockBound = true;
   }
 
@@ -282,12 +247,17 @@
     var sampleTitle = menuRoot.querySelector(".n-menu-item-group-title");
     var activeKey = getDockActiveKey();
     var collapsed = isSidebarCollapsed(menuRoot);
+    var signature = getDockRenderSignature("sidebar", dockVisible, collapsed);
     dom.dock.className = "xc-wallet-dock xc-wallet-dock--sidebar";
     dom.dock.hidden = !dockVisible;
     dom.dock.dataset.visible = dockVisible ? "true" : "false";
     dom.dock.dataset.collapsed = collapsed ? "true" : "false";
-    dom.dock.innerHTML = "";
     dom.dock.setAttribute("role", "group");
+    if (dom.dock.parentElement !== menuRoot) {
+      menuRoot.appendChild(dom.dock);
+    }
+    if (isDockRenderStable("sidebar", menuRoot, signature)) return;
+    dom.dock.innerHTML = "";
     var title = sampleTitle ? sampleTitle.cloneNode(false) : document.createElement("div");
     title.className = sampleTitle ? sampleTitle.className : "n-menu-item-group-title";
     title.textContent = t("title");
@@ -298,9 +268,7 @@
     });
     dom.dock.appendChild(title);
     dom.dock.appendChild(list);
-    if (dom.dock.parentElement !== menuRoot) {
-      menuRoot.appendChild(dom.dock);
-    }
+    setDockRenderState("sidebar", menuRoot, signature);
   }
 
   function floatingDockHtml() {
@@ -312,31 +280,41 @@
   }
 
   function renderFloatingDock(dockVisible) {
+    var signature = getDockRenderSignature("floating", dockVisible, false);
     dom.dock.className = "xc-wallet-dock xc-wallet-dock--floating";
     dom.dock.hidden = !dockVisible;
     dom.dock.dataset.visible = dockVisible ? "true" : "false";
     dom.dock.removeAttribute("data-collapsed");
-    dom.dock.innerHTML = dockVisible ? floatingDockHtml() : "";
     if (dom.dock.parentElement !== document.body) {
       document.body.appendChild(dom.dock);
     }
+    if (isDockRenderStable("floating", document.body, signature)) return;
+    dom.dock.innerHTML = dockVisible ? floatingDockHtml() : "";
+    setDockRenderState("floating", document.body, signature);
   }
 
   function renderDock() {
-    var dockVisible = shouldShowDock();
-    var menuRoot = dockVisible ? getSidebarMenuRoot() : null;
-    if (menuRoot) {
+    var allowDock = shouldShowDock();
+    var menuRoot = allowDock ? getSidebarMenuRoot() : null;
+    var resolved = resolveDockDisplayState({
+      allowDock: allowDock,
+      hasSidebar: !!menuRoot,
+      isWalletRoute: state.route.isWallet,
+      isMobile: isMobileViewport(),
+      shellReady: isAppShellReady()
+    });
+    updateDockRuntimeFlags(resolved.mode, resolved.floatingAllowed);
+    if (resolved.mode === "sidebar" && menuRoot) {
       clearDockProbe();
-      renderSidebarDock(menuRoot, dockVisible);
+      renderSidebarDock(menuRoot, resolved.visible);
       return;
     }
-    if (dockVisible && window.innerWidth > 720) {
+    if (resolved.probe) {
       scheduleDockProbe();
-      renderFloatingDock(false);
-      return;
+    } else {
+      clearDockProbe();
     }
-    clearDockProbe();
-    renderFloatingDock(dockVisible);
+    renderFloatingDock(resolved.visible);
   }
 
   function onDocumentClick(event) {
@@ -345,7 +323,7 @@
   }
 
   function scheduleDockSync() {
-    if (dockSyncFrame) cancelAnimationFrame(dockSyncFrame);
+    if (dockSyncFrame) return;
     dockSyncFrame = requestAnimationFrame(function () {
       dockSyncFrame = 0;
       if (!dom.dock) return;
@@ -353,9 +331,25 @@
     });
   }
 
+  function isDockOwnedNode(node) {
+    return !!(dom.dock && node && node.nodeType === 1 && (node === dom.dock || dom.dock.contains(node)));
+  }
+
+  function isDockOwnedRecord(record) {
+    if (!record) return false;
+    if (isDockOwnedNode(record.target)) return true;
+    if (record.type !== "childList") return false;
+    var changed = Array.prototype.slice.call(record.addedNodes || []).concat(Array.prototype.slice.call(record.removedNodes || []));
+    var elements = changed.filter(function (node) {
+      return node && node.nodeType === 1;
+    });
+    return !!(elements.length && elements.every(isDockOwnedNode));
+  }
+
   function shouldRefreshDock(records) {
     if (!records || !records.length) return false;
     return records.some(function (record) {
+      if (isDockOwnedRecord(record)) return false;
       var nodes = [];
       if (record.target) nodes.push(record.target);
       Array.prototype.push.apply(nodes, Array.prototype.slice.call(record.addedNodes || []));
@@ -564,6 +558,62 @@
     return (!!state.token || state.authed === true) && !isAuthPath(state.route.path);
   }
 
+  function isMobileViewport() {
+    return window.innerWidth <= 720;
+  }
+
+  function isAppShellReady() {
+    var appRoot = document.getElementById("app");
+    if (appRoot && appRoot.childElementCount > 0) return true;
+    return !!document.querySelector(".n-layout, .n-layout-header, .n-layout-content, .n-layout-sider, .n-drawer");
+  }
+
+  function resolveDockDisplayState(options) {
+    var input = options || {};
+    if (!input.allowDock) {
+      return { mode: "floating", visible: false, probe: false, floatingAllowed: false };
+    }
+    if (input.hasSidebar) {
+      return { mode: "sidebar", visible: true, probe: false, floatingAllowed: false };
+    }
+    if (input.isWalletRoute) {
+      return { mode: "floating", visible: true, probe: false, floatingAllowed: true };
+    }
+    if (input.isMobile) {
+      return { mode: "floating", visible: false, probe: true, floatingAllowed: false };
+    }
+    return { mode: "floating", visible: false, probe: !!input.shellReady, floatingAllowed: false };
+  }
+
+  function updateDockRuntimeFlags(mode, floatingAllowed) {
+    if (!document.body) return;
+    document.body.dataset.xcWalletDockMode = mode || "floating";
+    document.body.dataset.xcWalletFloatingAllowed = floatingAllowed ? "true" : "false";
+    document.body.dataset.xcWalletRoute = state.route.isWallet ? "true" : "false";
+  }
+
+  function getDockRenderSignature(mode, dockVisible, collapsed) {
+    return [
+      mode,
+      dockVisible ? "1" : "0",
+      collapsed ? "1" : "0",
+      getDockActiveKey(),
+      state.locale
+    ].join("|");
+  }
+
+  function isDockRenderStable(mode, parent, signature) {
+    return dockRenderState.mode === mode
+      && dockRenderState.parent === parent
+      && dockRenderState.signature === signature;
+  }
+
+  function setDockRenderState(mode, parent, signature) {
+    dockRenderState.mode = mode;
+    dockRenderState.parent = parent;
+    dockRenderState.signature = signature;
+  }
+
   function clearDockProbe() {
     if (dockProbeTimer) {
       clearTimeout(dockProbeTimer);
@@ -573,7 +623,7 @@
   }
 
   function scheduleDockProbe() {
-    if (dockProbeTimer || !shouldShowDock() || window.innerWidth <= 720 || dockProbeAttempts >= MAX_DOCK_PROBE_ATTEMPTS) return;
+    if (dockProbeTimer || !shouldShowDock() || dockProbeAttempts >= MAX_DOCK_PROBE_ATTEMPTS) return;
     dockProbeAttempts += 1;
     dockProbeTimer = setTimeout(function () {
       dockProbeTimer = 0;
@@ -664,7 +714,7 @@
   }
 
   function toast(message, tone) {
-    ensure();
+    ensureToastHost();
     var el = document.createElement("div");
     el.className = "xc-wallet-toast";
     if (tone) el.dataset.tone = tone;
@@ -710,31 +760,30 @@
     }
   }
 
-  function ensure() {
+  function ensureDockHost() {
     if (dom.dock) return;
     dom.dock = document.createElement("div");
     dom.dock.className = "xc-wallet-dock xc-wallet-dock--floating";
     dom.dock.addEventListener("click", onClick);
-    dom.dock.addEventListener("keydown", onDockKeydown);
+    document.body.appendChild(dom.dock);
+  }
+
+  function ensureWalletLayer() {
+    if (dom.overlay) return;
     dom.overlay = document.createElement("div");
     dom.overlay.className = "xc-wallet-overlay";
     dom.overlay.addEventListener("click", onClick);
     dom.shell = document.createElement("div");
     dom.shell.className = "xc-wallet-shell";
     dom.overlay.appendChild(dom.shell);
-    dom.toast = document.createElement("div");
-    dom.toast.className = "xc-wallet-toast-stack";
-    document.body.appendChild(dom.dock);
     document.body.appendChild(dom.overlay);
-    document.body.appendChild(dom.toast);
   }
 
-  function onDockKeydown(event) {
-    if (!event || (event.key !== "Enter" && event.key !== " ")) return;
-    var target = event.target.closest("[data-xc]");
-    if (!target) return;
-    event.preventDefault();
-    target.click();
+  function ensureToastHost() {
+    if (dom.toast) return;
+    dom.toast = document.createElement("div");
+    dom.toast.className = "xc-wallet-toast-stack";
+    document.body.appendChild(dom.toast);
   }
 
   function onClick(event) {
@@ -778,12 +827,17 @@
   }
 
   function render() {
-    ensure();
+    ensureDockHost();
     applyLocaleDirection(state.locale);
     renderDock();
-    dom.overlay.dataset.open = state.route.isWallet ? "true" : "false";
-    dom.overlay.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
-    dom.overlay.dataset.locale = intlLocale();
+    if (state.route.isWallet) {
+      ensureWalletLayer();
+    }
+    if (dom.overlay) {
+      dom.overlay.dataset.open = state.route.isWallet ? "true" : "false";
+      dom.overlay.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
+      dom.overlay.dataset.locale = intlLocale();
+    }
     document.body.classList.toggle("xc-wallet-open", state.route.isWallet);
     document.body.classList.toggle("xc-rtl", isRtlLocale(state.locale));
     if (!state.route.isWallet) return;
@@ -1001,7 +1055,7 @@
   }
 
   function init() {
-    ensure();
+    ensureDockHost();
     load(false);
     if (document.body) {
       var observer = new MutationObserver(function (records) {

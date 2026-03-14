@@ -471,6 +471,10 @@ body.xc-rtl .xc-wallet-dock--floating {
 }
 
 @media (max-width: 720px) {
+  body[data-xc-wallet-floating-allowed="false"] .xc-wallet-dock--floating {
+    display: none !important;
+  }
+
   .xc-wallet-shell {
     width: min(100% - 24px, 100%);
     margin: 16px auto 96px;

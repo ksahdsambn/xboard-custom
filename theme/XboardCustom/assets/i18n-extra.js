@@ -4592,6 +4592,9 @@
   var AUTH_CUSTOM_TRIGGER_CLASS = 'xc-auth-locale-custom-trigger';
   var AUTH_PAGE_CLASS = 'xc-auth-page';
   var authLocaleLayoutFrame = 0;
+  var authPageStateSyncFrame = 0;
+  var authPageStateSyncFollowFrame = 0;
+  var authPageStateSyncTimer = 0;
   var authLocaleObserver = null;
   var authLocaleScrollbarWidth = 0;
   var authCustomLocalePanel = null;
@@ -4763,9 +4766,44 @@
     });
     return widest || menu.getBoundingClientRect().width || 0;
   }
-  function ensureAuthPageState() {
+  function syncAuthPageState() {
     if (!document.body) return;
-    document.body.classList.toggle(AUTH_PAGE_CLASS, isAuthPath(readCurrentHashPath()));
+    var authPage = isAuthPath(readCurrentHashPath());
+    document.body.classList.toggle(AUTH_PAGE_CLASS, authPage);
+    if (!authPage) {
+      clearAuthLocaleLayout();
+    }
+  }
+  function ensureAuthPageState() {
+    syncAuthPageState();
+  }
+  function scheduleAuthPageStateSync() {
+    if (!document.body) {
+      whenBodyReady(scheduleAuthPageStateSync);
+      return;
+    }
+    syncAuthPageState();
+    if (authPageStateSyncFrame) {
+      cancelAnimationFrame(authPageStateSyncFrame);
+    }
+    if (authPageStateSyncFollowFrame) {
+      cancelAnimationFrame(authPageStateSyncFollowFrame);
+    }
+    if (authPageStateSyncTimer) {
+      clearTimeout(authPageStateSyncTimer);
+    }
+    authPageStateSyncFrame = requestAnimationFrame(function () {
+      authPageStateSyncFrame = 0;
+      syncAuthPageState();
+      authPageStateSyncFollowFrame = requestAnimationFrame(function () {
+        authPageStateSyncFollowFrame = 0;
+        syncAuthPageState();
+      });
+    });
+    authPageStateSyncTimer = setTimeout(function () {
+      authPageStateSyncTimer = 0;
+      syncAuthPageState();
+    }, 90);
   }
   function ensureAuthLocaleStyles() {
     if (!document.head || document.getElementById('xc-auth-locale-style')) return;
@@ -5318,7 +5356,7 @@
   }
   function initAuthLocaleDropdowns() {
     if (!document.body) return;
-    ensureAuthPageState();
+    scheduleAuthPageStateSync();
     ensureAuthLocaleStyles();
     if (!authLocaleObserver) {
       authLocaleObserver = new MutationObserver(function (records) {
@@ -5349,6 +5387,7 @@
       window.addEventListener('scroll', scheduleAuthLocaleDropdownSync, { passive: true, capture: true });
       window.addEventListener('orientationchange', scheduleAuthLocaleDropdownSync);
     }
+    scheduleAuthPageStateSync();
     scheduleAuthLocaleDropdownSync();
   }
   function whenBodyReady(callback) {
@@ -5367,7 +5406,7 @@
       document.body.dir = rtl ? 'rtl' : 'ltr';
       document.body.classList.toggle('xc-rtl', rtl);
     }
-    ensureAuthPageState();
+    scheduleAuthPageStateSync();
     scheduleAuthLocaleDropdownSync();
   }
   window.__xboardCustomGetStoredLocale = readStoredLocale;
@@ -5382,6 +5421,11 @@
   });
   window.addEventListener('hashchange', function () {
     applyLocaleDirection(readStoredLocale() || document.documentElement.lang || navigator.language || 'zh-CN');
+    scheduleAuthPageStateSync();
+    scheduleAuthLocaleDropdownSync();
+  });
+  window.addEventListener('pageshow', function () {
+    scheduleAuthPageStateSync();
     scheduleAuthLocaleDropdownSync();
   });
 })();
