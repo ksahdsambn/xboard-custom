@@ -830,7 +830,14 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `node --check theme/XboardCustom/assets/i18n-extra.js`
 - `node --test tests/runtime-regression.test.js`
 
-#### 4. Files
+#### 4. Feedback
+
+- User feedback confirmed the bug is resolved after deployment.
+- Existing-login cold start into `#/dashboard` no longer shows the white-screen / bottom-dock-only state on the affected path.
+- First post-login redirect to dashboard no longer leaves `body.xc-auth-page` behind.
+- This runtime fix is now considered verified in real use and can be treated as closed unless new device-specific regressions appear.
+
+#### 5. Files
 
 - `theme/XboardCustom/assets/wallet-center.js`
 - `theme/XboardCustom/assets/i18n-extra.js`
