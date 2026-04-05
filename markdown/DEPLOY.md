@@ -127,6 +127,40 @@ yum update -y && yum install -y git rsync
 
 如果你是严格按照官方 `compose` 分支拉取，通常已经带好，不需要手工改。
 
+如果你还需要为 1Panel 反向代理或同机服务接入额外 Docker 网络，不要直接修改官方 `compose.yaml`。
+请把本地网络定制写到：
+
+- `/opt/xboard-custom/deploy/compose.1panel.override.yaml`
+
+当前仓库提供的示例内容是：
+
+```yaml
+services:
+  web:
+    networks:
+      - xboard
+      - 1panel-network
+  horizon:
+    networks:
+      - xboard
+      - 1panel-network
+  redis:
+    networks:
+      - xboard
+
+networks:
+  xboard:
+    driver: bridge
+  1panel-network:
+    external: true
+```
+
+之后所有官方更新脚本和 compose 命令都要同时加载：
+
+```bash
+docker compose -f compose.yaml -f /opt/xboard-custom/deploy/compose.1panel.override.yaml ...
+```
+
 ### 第 5 步：初始化安装官方 Xboard
 
 在 1Panel `终端` 执行：
@@ -329,25 +363,22 @@ CUSTOM_BRANCH=main OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /o
 
 ```bash
 set -euo pipefail
-cd /opt/1panel/www/sites/xboard/index
-git pull --ff-only origin compose
-docker compose pull
-docker compose run --rm -T web php artisan xboard:update
-docker compose up -d
-
-FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-official-from-git.sh
 ```
 
 如果你的 `xboard-custom` 默认分支不是 `main`，可以改成：
 
 ```bash
-FORCE_DEPLOY=1 CUSTOM_BRANCH=你的分支名 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
+CUSTOM_BRANCH=你的分支名 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-official-from-git.sh
 ```
 
-这里使用 `FORCE_DEPLOY=1` 的原因是：
+这个脚本会自动做完下面几步：
 
-- 官方底座刚更新完，即使 `xboard-custom` 仓库本身没有新代码，也建议重新执行一次 overlay 同步和主题刷新
-- 这样可以保证插件目录、主题目录和发布后的静态资源都按当前官方底座重新落地
+- 在官方运行目录执行 `git pull --ff-only origin compose`
+- 使用 `compose.yaml + compose.1panel.override.yaml` 执行 `docker compose pull`
+- 执行 `php artisan xboard:update`
+- 使用同一套 compose 配置 `up -d`
+- 最后强制重新叠加一次 `xboard-custom` overlay，并刷新主题
 
 ### 官方更新时的操作顺序
 
@@ -450,13 +481,7 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 ```bash
 set -euo pipefail
-cd /opt/1panel/www/sites/xboard/index
-git pull --ff-only origin compose
-docker compose pull
-docker compose run --rm -T web php artisan xboard:update
-docker compose up -d
-
-FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-official-from-git.sh
 ```
 
 ## 七、最终结论

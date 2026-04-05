@@ -95,6 +95,10 @@
 - `xboard-official-update` 任务应在官方底座更新完成后使用：
   - `FORCE_DEPLOY=1`
   - 重新叠加自定义层并刷新主题
+- 已确认 1Panel 本地网络定制不能直接写进官方 `compose.yaml`
+  - 否则 `git pull --ff-only origin compose` 会因为 `compose.yaml` 本地改动而被 Git 拒绝
+  - 当前固定改为通过 `/opt/xboard-custom/deploy/compose.1panel.override.yaml` 追加 `xboard`、`1panel-network`
+  - 官方更新统一改走 `/opt/xboard-custom/scripts/update-official-from-git.sh`
 
 #### 8. 已确认的 1Panel 运行根目录
 
@@ -120,13 +124,7 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 
 ```bash
 set -euo pipefail
-cd /opt/1panel/www/sites/xboard/index
-git pull --ff-only origin compose
-docker compose pull
-docker compose run --rm -T web php artisan xboard:update
-docker compose up -d
-
-FORCE_DEPLOY=1 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh
+OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-official-from-git.sh
 ```
 
 #### 10. 后续维护要求

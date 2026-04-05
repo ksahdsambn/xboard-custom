@@ -1,0 +1,18 @@
+services:
+  web:
+    networks:
+      - xboard
+      - 1panel-network
+  horizon:
+    networks:
+      - xboard
+      - 1panel-network
+  redis:
+    networks:
+      - xboard
+
+networks:
+  xboard:
+    driver: bridge
+  1panel-network:
+    external: true
