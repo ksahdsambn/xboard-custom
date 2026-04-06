@@ -842,3 +842,75 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `theme/XboardCustom/assets/wallet-center.css`
 - `tests/runtime-regression.test.js`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-04-06 1Panel official-update task migration to compose override
+
+#### 1. Problem
+
+- The 1Panel scheduled task `xboard-official-update` was failing during `git pull --ff-only origin compose`.
+- Root cause on the server was confirmed in `/opt/1panel/www/sites/xboard/index/compose.yaml`:
+  - local hand-written `networks` changes had been added directly to the tracked official compose file
+  - when upstream `compose` changed the same file, Git refused to fast-forward because local changes would be overwritten
+- At the same time, the custom repo update flow had already been fixed by making `xboard-custom` fetchable without interactive GitHub credentials.
+
+#### 2. Fix
+
+- Added a versioned compose override file:
+  - `/opt/xboard-custom/deploy/compose.1panel.override.yaml`
+- Added a dedicated official update wrapper script:
+  - `/opt/xboard-custom/scripts/update-official-from-git.sh`
+- Updated deployment documentation so that official updates no longer use inline `git pull + docker compose` task content.
+- On the server, the migration was executed in this order:
+  - pulled `/opt/xboard-custom` to the latest `main`
+  - confirmed the new override file and wrapper script were present
+  - backed up the current official `compose.yaml`
+  - restored `/opt/1panel/www/sites/xboard/index/compose.yaml` to the Git-tracked version
+  - validated merged compose rendering with:
+    - `docker compose -f compose.yaml -f /opt/xboard-custom/deploy/compose.1panel.override.yaml config`
+  - executed:
+    - `OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-official-from-git.sh`
+
+#### 3. Verification
+
+- Server execution completed successfully on 2026-04-06.
+- Official upstream `compose` branch fast-forwarded successfully:
+  - `6ed7228 -> 921cca0`
+- `php artisan xboard:update` ran successfully inside the compose stack.
+- Database migrations completed successfully, including:
+  - `2025_07_27_000001_create_v2_subscribe_templates_table`
+  - `2026_03_11_000001_replace_v2_log_with_admin_audit_log`
+  - `2026_03_11_000002_add_stat_user_record_at_index`
+  - `2026_03_15_060035_add_custom_config_and_cert_to_v2_server_table`
+  - `2026_03_28_161536_add_traffic_fields_to_servers`
+- Overlay redeploy also completed successfully:
+  - plugin directories were resynced
+  - `theme/XboardCustom` was resynced to `storage/theme/XboardCustom`
+  - `web` and `horizon` were restarted via the compose override
+  - theme refresh completed
+- Final server-side compose status confirmed all key services were up:
+  - `index-web-1`
+  - `index-horizon-1`
+  - `index-redis-1`
+  - `index-ws-server-1`
+- Current operational rule is now fixed:
+  - do not hand-edit `/opt/1panel/www/sites/xboard/index/compose.yaml` for local network customization
+  - put future Docker network overrides only into `/opt/xboard-custom/deploy/compose.1panel.override.yaml`
+
+#### 4. Follow-up
+
+- `xboard-official-update` in 1Panel should now use only:
+  - `OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-official-from-git.sh`
+- `xboard-custom-sync` should continue to use:
+  - `OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-overlay-from-git.sh`
+- After migration, manual acceptance is still recommended in the admin panel:
+  - confirm `stripe_payment`, `bepusdt_payment`, `wallet_center` are installed and enabled
+  - if any plugin shows an upgrade action, run that upgrade once
+  - confirm the active theme is still `XboardCustom`
+
+#### 5. Files
+
+- `deploy/compose.1panel.override.yaml`
+- `scripts/update-official-from-git.sh`
+- `markdown/DEPLOY.md`
+- `markdown/Memory-updates-each-time.md`
+- `markdown/代码托管方案.md`
