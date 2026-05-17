@@ -11,6 +11,7 @@ WEB_SERVICE="${WEB_SERVICE:-}"
 HORIZON_SERVICE="${HORIZON_SERVICE:-}"
 OVERLAY_FORCE_DEPLOY="${OVERLAY_FORCE_DEPLOY:-1}"
 COMPOSE_BIN="${COMPOSE_BIN:-}"
+REMOVE_ORPHANS="${REMOVE_ORPHANS:-0}"
 
 if [[ -z "${OFFICIAL_ROOT}" ]]; then
   echo "OFFICIAL_ROOT is required, for example: OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index"
@@ -93,15 +94,20 @@ fi
 echo "Pull latest service images with compose override"
 "${COMPOSE_CMD[@]}" pull
 
+up_args=(up -d)
+if [[ "${REMOVE_ORPHANS}" == "1" ]]; then
+  up_args+=(--remove-orphans)
+fi
+
 if [[ "${WEB_SERVICE}" == "xboard" ]]; then
   echo "Start updated xboard service"
-  "${COMPOSE_CMD[@]}" up -d --remove-orphans
+  "${COMPOSE_CMD[@]}" "${up_args[@]}"
 else
   echo "Run xboard:update"
   "${COMPOSE_CMD[@]}" run --rm -T "${WEB_SERVICE}" php artisan xboard:update
 
   echo "Start updated services"
-  "${COMPOSE_CMD[@]}" up -d --remove-orphans
+  "${COMPOSE_CMD[@]}" "${up_args[@]}"
 fi
 
 echo "Redeploy overlay with compose override"

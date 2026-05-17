@@ -368,7 +368,7 @@ CUSTOM_BRANCH=你的分支名 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /
 - 在官方运行目录执行 `git pull --ff-only origin compose`
 - 使用 `compose.yaml + compose.1panel.override.yaml` 执行 `docker compose pull`
 - 自动识别当前官方 compose 服务名
-- 当前单服务 `xboard` 结构直接执行 `up -d --remove-orphans`，由容器启动流程自动完成 `xboard:update`
+- 当前单服务 `xboard` 结构直接执行 `up -d`，由容器启动流程自动完成 `xboard:update`
 - 旧版 `web` 结构才会先手动执行 `php artisan xboard:update`
 - 最后强制重新叠加一次 `xboard-custom` overlay，并刷新主题
 

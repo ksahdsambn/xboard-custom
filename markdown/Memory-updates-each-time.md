@@ -973,10 +973,10 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 #### 2. Fix
 
 - Updated `scripts/update-official-from-git.sh`:
-  - when the detected service is `xboard`, it now runs `docker compose up -d --remove-orphans` after image pull
+  - when the detected service is `xboard`, it now runs `docker compose up -d` after image pull
   - it no longer runs a one-off `php artisan xboard:update` container for the single-service `xboard` layout
   - the legacy manual `php artisan xboard:update` path remains only for older `web` service layouts
-- Added `--remove-orphans` to cleanup old containers such as `index-web-1`, `index-horizon-1`, `index-redis-1`, and `index-ws-server-1` after migration to the single-service compose layout.
+- Added optional `REMOVE_ORPHANS=1` support for cleanup after the reverse proxy has been confirmed to target the new service or host port.
 
 #### 3. Follow-up
 
@@ -988,10 +988,26 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
   - `Redeploy overlay with compose override`
 - The log should no longer include:
   - `Run xboard:update`
-  - `Found orphan containers`
   - `MISCONF Redis is configured to save RDB snapshots`
 
-#### 4. Files
+#### 4. 2026-05-18 follow-up note
+
+- `--remove-orphans` must not be the default while 1Panel/OpenResty may still be pointing at old service containers.
+- If 1Panel reverse proxy still references old `web`/`index-web-1` upstreams, removing orphan containers can produce external `502 Bad Gateway`.
+- Long-term fix is to make the reverse proxy target the host port `127.0.0.1:7001` or the current `xboard` service, then run orphan cleanup manually if desired.
+- After the service-name and update-command fixes, the live site still returned Caddy `502` because Octane was not listening on `127.0.0.1:7002`.
+- Runtime investigation showed:
+  - `index-xboard-1` had `supervisord`, `caddy`, and `ws-server` running
+  - `redis-server` and `octane` were not running
+  - manual Redis startup failed with `Can't handle RDB format version 13`
+- Recovery was completed by backing up and moving the incompatible Redis cache snapshot:
+  - `/data/dump.rdb` -> `/data/backup/dump.rdb.bad-<timestamp>`
+  - fixed ownership with `chown -R redis:redis /data`
+  - restarted the `xboard` compose service
+- This restored `https://node.lokiflux.com/`.
+- The moved `dump.rdb` was Redis cache/queue state, not the Xboard database.
+
+#### 5. Files
 
 - `scripts/update-official-from-git.sh`
 - `markdown/DEPLOY.md`
