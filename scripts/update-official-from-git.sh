@@ -93,11 +93,16 @@ fi
 echo "Pull latest service images with compose override"
 "${COMPOSE_CMD[@]}" pull
 
-echo "Run xboard:update"
-"${COMPOSE_CMD[@]}" run --rm -T "${WEB_SERVICE}" php artisan xboard:update
+if [[ "${WEB_SERVICE}" == "xboard" ]]; then
+  echo "Start updated xboard service"
+  "${COMPOSE_CMD[@]}" up -d --remove-orphans
+else
+  echo "Run xboard:update"
+  "${COMPOSE_CMD[@]}" run --rm -T "${WEB_SERVICE}" php artisan xboard:update
 
-echo "Start updated services"
-"${COMPOSE_CMD[@]}" up -d
+  echo "Start updated services"
+  "${COMPOSE_CMD[@]}" up -d --remove-orphans
+fi
 
 echo "Redeploy overlay with compose override"
 CUSTOM_ROOT="${CUSTOM_ROOT}" \

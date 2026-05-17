@@ -958,3 +958,41 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `scripts/deploy-overlay.sh`
 - `markdown/DEPLOY.md`
 - `markdown/Memory-updates-each-time.md`
+
+### 2026-05-18 official single-service update command adjustment
+
+#### 1. Problem
+
+- After fixing the service-name mismatch, `xboard-official-update` reached the `xboard` container but failed during the old manual update step:
+  - `docker compose run --rm -T xboard php artisan xboard:update`
+- The current official 1Panel compose flow no longer requires this manual command.
+- Official 1Panel documentation now uses:
+  - `docker compose pull && docker compose up -d`
+- In the current image, the container boot process runs `xboard:update` automatically.
+
+#### 2. Fix
+
+- Updated `scripts/update-official-from-git.sh`:
+  - when the detected service is `xboard`, it now runs `docker compose up -d --remove-orphans` after image pull
+  - it no longer runs a one-off `php artisan xboard:update` container for the single-service `xboard` layout
+  - the legacy manual `php artisan xboard:update` path remains only for older `web` service layouts
+- Added `--remove-orphans` to cleanup old containers such as `index-web-1`, `index-horizon-1`, `index-redis-1`, and `index-ws-server-1` after migration to the single-service compose layout.
+
+#### 3. Follow-up
+
+- Deploy this repo update to `/opt/xboard-custom` and rerun the 1Panel official update task.
+- Expected log sequence for current official compose:
+  - `Pull origin/compose`
+  - `Pull latest service images with compose override`
+  - `Start updated xboard service`
+  - `Redeploy overlay with compose override`
+- The log should no longer include:
+  - `Run xboard:update`
+  - `Found orphan containers`
+  - `MISCONF Redis is configured to save RDB snapshots`
+
+#### 4. Files
+
+- `scripts/update-official-from-git.sh`
+- `markdown/DEPLOY.md`
+- `markdown/Memory-updates-each-time.md`
