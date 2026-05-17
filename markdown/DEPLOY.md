@@ -51,7 +51,7 @@
 
 - `scripts/deploy-overlay.sh`
   - 只负责把当前仓库里的插件和主题同步到官方运行目录
-  - 会重启 `web`、`horizon` 并刷新当前主题静态文件
+  - 会按当前 compose 服务名重启 `xboard` 或 `web`，旧版独立 `horizon` 存在时也会重启，并刷新当前主题静态文件
 - `scripts/update-overlay-from-git.sh`
   - 先执行 `git fetch` 和快进更新
   - 只有当 `plugins/` 或 `theme/` 发生变化时，才会调用 `deploy-overlay.sh`
@@ -136,21 +136,12 @@ yum update -y && yum install -y git rsync
 
 ```yaml
 services:
-  web:
+  xboard:
     networks:
-      - xboard
+      - default
       - 1panel-network
-  horizon:
-    networks:
-      - xboard
-      - 1panel-network
-  redis:
-    networks:
-      - xboard
 
 networks:
-  xboard:
-    driver: bridge
   1panel-network:
     external: true
 ```
@@ -376,7 +367,7 @@ CUSTOM_BRANCH=你的分支名 OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /
 
 - 在官方运行目录执行 `git pull --ff-only origin compose`
 - 使用 `compose.yaml + compose.1panel.override.yaml` 执行 `docker compose pull`
-- 执行 `php artisan xboard:update`
+- 自动识别当前官方 compose 服务名，并执行 `php artisan xboard:update`
 - 使用同一套 compose 配置 `up -d`
 - 最后强制重新叠加一次 `xboard-custom` overlay，并刷新主题
 

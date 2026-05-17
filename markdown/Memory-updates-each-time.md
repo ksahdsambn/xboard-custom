@@ -914,3 +914,47 @@ OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/sc
 - `markdown/DEPLOY.md`
 - `markdown/Memory-updates-each-time.md`
 - `markdown/代码托管方案.md`
+
+### 2026-05-18 official compose single-service compatibility fix
+
+#### 1. Problem
+
+- The 1Panel task `xboard-official-update` failed again after the upstream official `compose` branch changed its service layout.
+- The log showed `docker compose` errors such as:
+  - `service "redis" has neither an image nor a build context specified`
+  - `service "horizon" has neither an image nor a build context specified`
+  - `service "web" has neither an image nor a build context specified`
+- Root cause:
+  - the local override file still targeted the old official compose service names `web`, `horizon`, and `redis`
+  - the current official 1Panel compose layout uses a single `xboard` service with `ENABLE_HORIZON=true`
+  - Compose treated the override-only `web` / `horizon` / `redis` entries as new services without `image` or `build`
+
+#### 2. Fix
+
+- Updated `deploy/compose.1panel.override.yaml` to target the current official service:
+  - `services.xboard.networks = [default, 1panel-network]`
+  - `networks.1panel-network.external = true`
+- Updated `scripts/update-official-from-git.sh`:
+  - uses an absolute `compose.yaml` path in the default `COMPOSE_BIN`
+  - runs `docker compose config --services` after pulling official `compose`
+  - automatically uses `xboard` when the new service exists
+  - falls back to `web` for older compose layouts
+  - passes the detected service names into overlay redeploy
+- Updated `scripts/deploy-overlay.sh` so an explicitly empty `HORIZON_SERVICE` is respected.
+
+#### 3. Follow-up
+
+- Deploy this repo update to `/opt/xboard-custom` and rerun:
+  - `OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index /bin/bash /opt/xboard-custom/scripts/update-official-from-git.sh`
+- Expected result:
+  - `docker compose pull` no longer creates invalid `web` / `horizon` / `redis` services from the override
+  - `php artisan xboard:update` runs against the detected `xboard` service
+  - overlay refresh uses the same merged compose project
+
+#### 4. Files
+
+- `deploy/compose.1panel.override.yaml`
+- `scripts/update-official-from-git.sh`
+- `scripts/deploy-overlay.sh`
+- `markdown/DEPLOY.md`
+- `markdown/Memory-updates-each-time.md`

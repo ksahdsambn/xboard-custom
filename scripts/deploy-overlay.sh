@@ -4,7 +4,7 @@ set -euo pipefail
 CUSTOM_ROOT="${CUSTOM_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 OFFICIAL_ROOT="${OFFICIAL_ROOT:-}"
 WEB_SERVICE="${WEB_SERVICE:-web}"
-HORIZON_SERVICE="${HORIZON_SERVICE:-horizon}"
+HORIZON_SERVICE="${HORIZON_SERVICE-horizon}"
 THEME_NAME="${THEME_NAME:-XboardCustom}"
 THEME_TARGET_ROOT="${THEME_TARGET_ROOT:-storage/theme}"
 DRY_RUN="${DRY_RUN:-0}"
@@ -62,6 +62,10 @@ has_compose_service() {
 
 restart_service_if_exists() {
   local service_name="$1"
+  if [[ -z "${service_name}" ]]; then
+    return 0
+  fi
+
   if has_compose_service "${service_name}"; then
     echo "Restart compose service: ${service_name}"
     (

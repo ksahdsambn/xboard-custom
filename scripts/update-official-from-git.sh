@@ -7,9 +7,10 @@ OFFICIAL_REMOTE_NAME="${OFFICIAL_REMOTE_NAME:-origin}"
 OFFICIAL_BRANCH="${OFFICIAL_BRANCH:-compose}"
 OVERRIDE_COMPOSE_FILE="${OVERRIDE_COMPOSE_FILE:-${CUSTOM_ROOT}/deploy/compose.1panel.override.yaml}"
 UPDATE_OVERLAY_SCRIPT="${UPDATE_OVERLAY_SCRIPT:-${CUSTOM_ROOT}/scripts/update-overlay-from-git.sh}"
-WEB_SERVICE="${WEB_SERVICE:-web}"
+WEB_SERVICE="${WEB_SERVICE:-}"
+HORIZON_SERVICE="${HORIZON_SERVICE:-}"
 OVERLAY_FORCE_DEPLOY="${OVERLAY_FORCE_DEPLOY:-1}"
-COMPOSE_BIN="${COMPOSE_BIN:-docker compose -f compose.yaml -f ${OVERRIDE_COMPOSE_FILE}}"
+COMPOSE_BIN="${COMPOSE_BIN:-}"
 
 if [[ -z "${OFFICIAL_ROOT}" ]]; then
   echo "OFFICIAL_ROOT is required, for example: OFFICIAL_ROOT=/opt/1panel/www/sites/xboard/index"
@@ -56,9 +57,10 @@ if [[ ! -f "${UPDATE_OVERLAY_SCRIPT}" ]]; then
   exit 1
 fi
 
-read -r -a COMPOSE_CMD <<< "${COMPOSE_BIN}"
-
 cd "${OFFICIAL_ROOT}"
+
+COMPOSE_BIN="${COMPOSE_BIN:-docker compose -f ${OFFICIAL_ROOT}/compose.yaml -f ${OVERRIDE_COMPOSE_FILE}}"
+read -r -a COMPOSE_CMD <<< "${COMPOSE_BIN}"
 
 # Keep the tracked compose.yaml clean so official fast-forward updates never block on local network tweaks.
 if ! git diff --quiet -- compose.yaml || ! git diff --cached --quiet -- compose.yaml; then
@@ -69,6 +71,24 @@ fi
 
 echo "Pull ${OFFICIAL_REMOTE_NAME}/${OFFICIAL_BRANCH}"
 git pull --ff-only "${OFFICIAL_REMOTE_NAME}" "${OFFICIAL_BRANCH}"
+
+compose_services="$("${COMPOSE_CMD[@]}" config --services)"
+
+if [[ -z "${WEB_SERVICE}" ]]; then
+  if grep -qx "xboard" <<< "${compose_services}"; then
+    WEB_SERVICE="xboard"
+  elif grep -qx "web" <<< "${compose_services}"; then
+    WEB_SERVICE="web"
+  else
+    echo "Cannot find a web service in compose services:"
+    printf '%s\n' "${compose_services}"
+    exit 1
+  fi
+fi
+
+if [[ -z "${HORIZON_SERVICE}" && "${WEB_SERVICE}" == "web" ]] && grep -qx "horizon" <<< "${compose_services}"; then
+  HORIZON_SERVICE="horizon"
+fi
 
 echo "Pull latest service images with compose override"
 "${COMPOSE_CMD[@]}" pull
@@ -83,5 +103,7 @@ echo "Redeploy overlay with compose override"
 CUSTOM_ROOT="${CUSTOM_ROOT}" \
 OFFICIAL_ROOT="${OFFICIAL_ROOT}" \
 COMPOSE_BIN="${COMPOSE_BIN}" \
+WEB_SERVICE="${WEB_SERVICE}" \
+HORIZON_SERVICE="${HORIZON_SERVICE}" \
 FORCE_DEPLOY="${OVERLAY_FORCE_DEPLOY}" \
 bash "${UPDATE_OVERLAY_SCRIPT}"
