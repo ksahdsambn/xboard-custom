@@ -51,6 +51,23 @@ class CheckinService
             ->get();
     }
 
+    public function paginateHistoryForUser(User $user, int $page = 1, int $perPage = 10): array
+    {
+        $query = CheckinLog::query()->where('user_id', $user->id);
+        $total = (int) $query->count();
+        $perPage = max(1, min(50, $perPage));
+        $page = max(1, $page);
+        $records = $query->orderByDesc('claim_date')->orderByDesc('id')->forPage($page, $perPage)->get();
+
+        return [
+            'records' => $records,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'last_page' => max(1, (int) ceil($total / $perPage)),
+        ];
+    }
+
     public function getAdminHistory(int $limit = 20): Collection
     {
         return CheckinLog::query()

@@ -76,15 +76,18 @@ class AutoRenewController extends BaseController
             return $response;
         }
 
-        $records = $this->autoRenewService->getHistoryForUser(
+        $page = $this->resolvePage($request);
+        $perPage = $this->resolveLimit($request, 10, 50);
+        $history = $this->autoRenewService->paginateHistoryForUser(
             $request->user(),
-            $this->resolveLimit($request)
+            $page,
+            $perPage,
+            $request->query('status')
         );
 
-        return $this->success($this->featurePayload(WalletCenterFeature::AUTO_RENEW, [
-            'records' => $records,
-            'count' => $records->count(),
+        return $this->success($this->featurePayload(WalletCenterFeature::AUTO_RENEW, array_merge($history, [
+            'count' => $history['total'],
             'config' => $this->autoRenewService->getConfigSnapshot($request->user()),
-        ], 'wallet-center'));
+        ]), 'wallet-center'));
     }
 }

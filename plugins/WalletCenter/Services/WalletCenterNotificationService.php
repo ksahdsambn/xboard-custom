@@ -78,7 +78,7 @@ class WalletCenterNotificationService
                 'template_value' => [
                     'name' => $email,
                     'content' => $message,
-                    'url' => rtrim((string) config('app.url'), '/') . '/#/dashboard?xc_wallet=1&section=renew',
+                    'url' => rtrim((string) config('app.url'), '/') . '/#/profile?section=renew',
                 ],
             ]);
         } catch (\Throwable $exception) {

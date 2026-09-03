@@ -95,16 +95,19 @@ class TopupController extends BaseController
             return $response;
         }
 
-        $records = $this->topupService->getHistoryForUser(
+        $page = $this->resolvePage($request);
+        $perPage = $this->resolveLimit($request, 10, 50);
+        $history = $this->topupService->paginateHistoryForUser(
             $request->user(),
-            $this->resolveLimit($request)
+            $page,
+            $perPage,
+            $request->query('status')
         );
 
-        return $this->success($this->featurePayload(WalletCenterFeature::TOPUP, [
-            'records' => $records,
-            'count' => $records->count(),
+        return $this->success($this->featurePayload(WalletCenterFeature::TOPUP, array_merge($history, [
+            'count' => $history['total'],
             'amount_range' => $this->topupService->getAmountRangeSnapshot(),
-        ], 'wallet-center'));
+        ]), 'wallet-center'));
     }
 
     public function notify(Request $request, string $method, string $uuid)

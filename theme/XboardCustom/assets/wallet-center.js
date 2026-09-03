@@ -2,12 +2,10 @@
   if (window.__xboardCustomWalletCenterLoaded) return;
   window.__xboardCustomWalletCenterLoaded = true;
 
-  var PREV = "xboardCustom.previousHash";
   var LAST_TOPUP = "xboardCustom.lastTopupTradeNo";
-  var DEFAULT_HASH = "#/dashboard";
-  var WALLET_HASH = (window.xboardCustom && window.xboardCustom.walletHash) || "#/wallet";
   var EXTRA_I18N = window.xboardCustomI18n || {};
   var RTL_LOCALES = EXTRA_I18N.rtlLocales || ["fa-IR", "ar-SA"];
+  var OFFICIAL_PATH = "/profile";
   var text = buildTextCatalog();
   var supportedLocales = Object.keys(text);
   var state = {
@@ -22,362 +20,26 @@
     comm: null,
     checkin: {},
     topup: {},
-    renew: {}
+    renew: {},
+    pages: { checkin: 1, topup: 1, renew: 1 },
+    filters: { topup: "all", renew: "all" }
   };
   var dom = {};
-  var dockSyncFrame = 0;
-  var authProbeTimer = 0;
-  var authProbeAttempts = 0;
-  var MAX_AUTH_PROBE_ATTEMPTS = 12;
-  var AUTH_PROBE_DELAY = 700;
-  var dockProbeTimer = 0;
-  var dockProbeAttempts = 0;
-  var MAX_DOCK_PROBE_ATTEMPTS = 20;
-  var DOCK_PROBE_DELAY = 450;
-  var dockRenderState = {
-    mode: "",
-    parent: null,
-    signature: ""
-  };
-
-  function dockItems() {
-    return [
-      { key: "wallet", action: "wallet", label: t("wallet") },
-      { key: "checkin", action: "section", section: "checkin", label: t("checkin") },
-      { key: "topup", action: "section", section: "topup", label: t("topup") },
-      { key: "renew", action: "section", section: "renew", label: t("renew") }
-    ];
-  }
-
-  function createDockIconMarkup(key) {
-    if (key === "wallet") {
-      return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.75 6.25A2.5 2.5 0 0 1 6.25 3.75h8.125A1.875 1.875 0 0 1 16.25 5.625V7.5h-2.5a3.125 3.125 0 0 0 0 6.25h2.5v.625a1.875 1.875 0 0 1-1.875 1.875H6.25a2.5 2.5 0 0 1-2.5-2.5v-7.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.75 8.75h2.5A1.25 1.25 0 0 1 17.5 10v1.25a1.25 1.25 0 0 1-1.25 1.25h-2.5A1.25 1.25 0 0 1 12.5 11.25V10a1.25 1.25 0 0 1 1.25-1.25Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.75 10.625h.625" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-    }
-    if (key === "checkin") {
-      return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.25 2.917v2.5M13.75 2.917v2.5M4.583 7.083h10.834" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="3.75" y="4.583" width="12.5" height="11.667" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="m7.5 10 1.667 1.667 3.333-3.334" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    }
-    if (key === "topup") {
-      return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3.333v13.334M5.833 7.5 10 3.333 14.167 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.167 12.5v1.667a2.5 2.5 0 0 0 2.5 2.5h6.666a2.5 2.5 0 0 0 2.5-2.5V12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-    }
-    return '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M15.102 7.083A5.833 5.833 0 1 0 15.833 10h-2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.833 4.583v5h-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  }
-
-  function getDockActiveKey() {
-    if (!state.route.isWallet) return "";
-    if (state.route.section === "checkin" || state.route.section === "topup" || state.route.section === "renew") {
-      return state.route.section;
-    }
-    return "wallet";
-  }
-
-  function isElementVisible(el) {
-    if (!el || !el.isConnected) return false;
-    var rect = el.getBoundingClientRect();
-    var style = window.getComputedStyle(el);
-    return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-  }
-
-  function getSidebarMenuRoot() {
-    var menus = Array.prototype.filter.call(
-      document.querySelectorAll(".n-layout-sider .n-menu, .n-drawer .n-menu"),
-      function (menu) {
-        return isElementVisible(menu) && !!menu.querySelector(".n-menu-item");
-      }
-    );
-    if (!menus.length) return null;
-    menus.sort(function (a, b) {
-      return b.getBoundingClientRect().height - a.getBoundingClientRect().height;
-    });
-    return menus[0];
-  }
-
-  function isSidebarCollapsed(menuRoot) {
-    var sider = menuRoot && menuRoot.closest(".n-layout-sider, .n-drawer");
-    if (sider && sider.classList.contains("n-layout-sider--collapsed")) return true;
-    var rect = menuRoot ? menuRoot.getBoundingClientRect() : null;
-    return !!(rect && rect.width > 0 && rect.width < 120);
-  }
-
-  function stripNodeIds(node) {
-    if (!node || node.nodeType !== 1) return;
-    node.removeAttribute("id");
-    Array.prototype.forEach.call(node.querySelectorAll("[id]"), function (el) {
-      el.removeAttribute("id");
-    });
-  }
-
-  function createFallbackSidebarItem(item, active, collapsed) {
-    var node = document.createElement("div");
-    node.className = "n-menu-item xc-wallet-dock__item";
-    node.setAttribute("role", "menuitem");
-    var content = document.createElement("div");
-    content.className = "n-menu-item-content" + (active ? " n-menu-item-content--selected" : "") + (collapsed ? " n-menu-item-content--collapsed" : "");
-    content.setAttribute("data-xc", item.action);
-    if (item.section) content.setAttribute("data-section", item.section);
-    content.setAttribute("data-xc-dock-key", item.key);
-    content.setAttribute("tabindex", "0");
-    content.setAttribute("role", "button");
-    content.setAttribute("title", item.label);
-    var icon = document.createElement("div");
-    icon.className = "n-menu-item-content__icon xc-wallet-dock__icon";
-    icon.innerHTML = createDockIconMarkup(item.key);
-    var header = document.createElement("div");
-    header.className = "n-menu-item-content-header";
-    header.textContent = item.label;
-    content.appendChild(icon);
-    content.appendChild(header);
-    node.appendChild(content);
-    bindDockInteractiveTarget(content, item);
-    bindDockHoverState(node, content);
-    return node;
-  }
-
-  function buildSidebarDockItem(sampleItem, item, active, collapsed) {
-    if (!sampleItem) return createFallbackSidebarItem(item, active, collapsed);
-    var node = sampleItem.cloneNode(true);
-    stripNodeIds(node);
-    node.classList.add("xc-wallet-dock__item");
-    var content = node.querySelector(".n-menu-item-content") || node;
-    var icon = content.querySelector(".n-menu-item-content__icon");
-    var header = content.querySelector(".n-menu-item-content-header");
-    var extra = content.querySelector(".n-menu-item-content-header__extra");
-    var arrow = content.querySelector(".n-menu-item-content__arrow");
-    if (!icon) {
-      icon = document.createElement("div");
-      icon.className = "n-menu-item-content__icon xc-wallet-dock__icon";
-      content.insertBefore(icon, content.firstChild || null);
-    }
-    if (!header) {
-      header = document.createElement("div");
-      header.className = "n-menu-item-content-header";
-      content.appendChild(header);
-    }
-    if (extra) extra.remove();
-    if (arrow) arrow.remove();
-    icon.classList.add("xc-wallet-dock__icon");
-    icon.innerHTML = createDockIconMarkup(item.key);
-    header.textContent = item.label;
-    content.classList.toggle("n-menu-item-content--selected", !!active);
-    content.classList.toggle("n-menu-item-content--collapsed", !!collapsed);
-    content.classList.remove("n-menu-item-content--disabled");
-    content.classList.remove("n-menu-item-content--child-active");
-    content.classList.remove("n-menu-item-content--hover");
-    content.setAttribute("data-xc", item.action);
-    content.setAttribute("data-xc-dock-key", item.key);
-    content.setAttribute("role", "button");
-    content.setAttribute("tabindex", "0");
-    content.setAttribute("title", item.label);
-    if (item.section) {
-      content.setAttribute("data-section", item.section);
-    } else {
-      content.removeAttribute("data-section");
-    }
-    bindDockInteractiveTarget(content, item);
-    bindDockHoverState(node, content);
-    return node;
-  }
-
-  function setDockHoverState(node, content, active) {
-    [node, content].forEach(function (target) {
-      if (!target) return;
-      target.classList.toggle("xc-wallet-dock__item--hover", !!active);
-    });
-    if (!content) return;
-    if (!active) {
-      content.style.backgroundColor = "";
-      content.style.boxShadow = "";
-      content.style.transform = "";
-      content.style.color = "";
-      return;
-    }
-    if (content.classList.contains("n-menu-item-content--selected")) {
-      content.style.backgroundColor = "rgba(22, 163, 74, 0.16)";
-      content.style.boxShadow = "inset 0 0 0 1px rgba(22, 163, 74, 0.12)";
-    } else {
-      content.style.backgroundColor = "rgba(15, 23, 42, 0.08)";
-      content.style.boxShadow = "inset 0 0 0 1px rgba(15, 23, 42, 0.06)";
-    }
-    content.style.transform = document.body && document.body.classList.contains("xc-rtl")
-      ? "translateX(-1px)"
-      : "translateX(1px)";
-    content.style.color = "var(--xc-text)";
-  }
-
-  function bindDockHoverState(node, content) {
-    [node, content].forEach(function (target) {
-      if (!target || target.__xcWalletDockHoverBound) return;
-      target.addEventListener("pointerenter", function () { setDockHoverState(node, content, true); });
-      target.addEventListener("pointerleave", function () { setDockHoverState(node, content, false); });
-      target.addEventListener("focus", function () { setDockHoverState(node, content, true); }, true);
-      target.addEventListener("blur", function () { setDockHoverState(node, content, false); }, true);
-      target.__xcWalletDockHoverBound = true;
-    });
-  }
-
-  function runDockAction(action, section, enabled) {
-    if (action === "wallet") openWallet("");
-    if (action === "section") openWallet(section || "");
-    if (action === "close") closeWallet();
-    if (action === "refresh") load(true);
-    if (action === "login") location.hash = "#/login";
-    if (action === "claim") claim();
-    if (action === "topup") createTopup();
-    if (action === "renew") toggleRenew(enabled === "1");
-  }
-
-  function bindDockInteractiveTarget(target, item) {
-    if (!target || target.__xcWalletDockBound) return;
-    if (item && item.action) {
-      target.setAttribute("data-xc", item.action);
-      if (item.section) {
-        target.setAttribute("data-section", item.section);
-      } else {
-        target.removeAttribute("data-section");
-      }
-      target.setAttribute("data-xc-dock-key", item.key);
-    }
-    target.addEventListener("keydown", function (event) {
-      if (!event || (event.key !== "Enter" && event.key !== " ")) return;
-      event.preventDefault();
-      runDockAction(target.getAttribute("data-xc"), target.getAttribute("data-section"), target.getAttribute("data-enabled"));
-    });
-    target.__xcWalletDockBound = true;
-  }
-
-  function renderSidebarDock(menuRoot, dockVisible) {
-    var sampleItem = menuRoot.querySelector(".n-menu-item");
-    var sampleTitle = menuRoot.querySelector(".n-menu-item-group-title");
-    var activeKey = getDockActiveKey();
-    var collapsed = isSidebarCollapsed(menuRoot);
-    var signature = getDockRenderSignature("sidebar", dockVisible, collapsed);
-    dom.dock.className = "xc-wallet-dock xc-wallet-dock--sidebar";
-    dom.dock.hidden = !dockVisible;
-    dom.dock.dataset.visible = dockVisible ? "true" : "false";
-    dom.dock.dataset.collapsed = collapsed ? "true" : "false";
-    dom.dock.setAttribute("role", "group");
-    if (dom.dock.parentElement !== menuRoot) {
-      menuRoot.appendChild(dom.dock);
-    }
-    if (isDockRenderStable("sidebar", menuRoot, signature)) return;
-    dom.dock.innerHTML = "";
-    var title = sampleTitle ? sampleTitle.cloneNode(false) : document.createElement("div");
-    title.className = sampleTitle ? sampleTitle.className : "n-menu-item-group-title";
-    title.textContent = t("title");
-    var list = document.createElement("div");
-    list.className = "xc-wallet-dock__items";
-    dockItems().forEach(function (item) {
-      list.appendChild(buildSidebarDockItem(sampleItem, item, item.key === activeKey, collapsed));
-    });
-    dom.dock.appendChild(title);
-    dom.dock.appendChild(list);
-    setDockRenderState("sidebar", menuRoot, signature);
-  }
-
-  function floatingDockHtml() {
-    return ''
-      + '<button type="button" data-xc="wallet" data-variant="primary">' + esc(t("wallet")) + "</button>"
-      + '<button type="button" data-xc="section" data-section="checkin">' + esc(t("checkin")) + "</button>"
-      + '<button type="button" data-xc="section" data-section="topup">' + esc(t("topup")) + "</button>"
-      + '<button type="button" data-xc="section" data-section="renew">' + esc(t("renew")) + "</button>";
-  }
-
-  function renderFloatingDock(dockVisible) {
-    var signature = getDockRenderSignature("floating", dockVisible, false);
-    dom.dock.className = "xc-wallet-dock xc-wallet-dock--floating";
-    dom.dock.hidden = !dockVisible;
-    dom.dock.dataset.visible = dockVisible ? "true" : "false";
-    dom.dock.removeAttribute("data-collapsed");
-    if (dom.dock.parentElement !== document.body) {
-      document.body.appendChild(dom.dock);
-    }
-    if (isDockRenderStable("floating", document.body, signature)) return;
-    dom.dock.innerHTML = dockVisible ? floatingDockHtml() : "";
-    setDockRenderState("floating", document.body, signature);
-  }
-
-  function renderDock() {
-    var allowDock = shouldShowDock();
-    var menuRoot = allowDock ? getSidebarMenuRoot() : null;
-    var resolved = resolveDockDisplayState({
-      allowDock: allowDock,
-      hasSidebar: !!menuRoot,
-      isWalletRoute: state.route.isWallet,
-      isMobile: isMobileViewport(),
-      shellReady: isAppShellReady()
-    });
-    updateDockRuntimeFlags(resolved.mode, resolved.floatingAllowed);
-    if (resolved.mode === "sidebar" && menuRoot) {
-      clearDockProbe();
-      renderSidebarDock(menuRoot, resolved.visible);
-      return;
-    }
-    if (resolved.probe) {
-      scheduleDockProbe();
-    } else {
-      clearDockProbe();
-    }
-    renderFloatingDock(resolved.visible);
-  }
-
-  function onDocumentClick(event) {
-    if (dom.dock && event && event.target && dom.dock.contains(event.target)) return;
-    scheduleDockSync();
-  }
-
-  function scheduleDockSync() {
-    if (dockSyncFrame) return;
-    dockSyncFrame = requestAnimationFrame(function () {
-      dockSyncFrame = 0;
-      if (!dom.dock) return;
-      renderDock();
-    });
-  }
-
-  function isDockOwnedNode(node) {
-    return !!(dom.dock && node && node.nodeType === 1 && (node === dom.dock || dom.dock.contains(node)));
-  }
-
-  function isDockOwnedRecord(record) {
-    if (!record) return false;
-    if (isDockOwnedNode(record.target)) return true;
-    if (record.type !== "childList") return false;
-    var changed = Array.prototype.slice.call(record.addedNodes || []).concat(Array.prototype.slice.call(record.removedNodes || []));
-    var elements = changed.filter(function (node) {
-      return node && node.nodeType === 1;
-    });
-    return !!(elements.length && elements.every(isDockOwnedNode));
-  }
-
-  function shouldRefreshDock(records) {
-    if (!records || !records.length) return false;
-    return records.some(function (record) {
-      if (isDockOwnedRecord(record)) return false;
-      var nodes = [];
-      if (record.target) nodes.push(record.target);
-      Array.prototype.push.apply(nodes, Array.prototype.slice.call(record.addedNodes || []));
-      Array.prototype.push.apply(nodes, Array.prototype.slice.call(record.removedNodes || []));
-      return nodes.some(function (node) {
-        if (!node || node.nodeType !== 1) return false;
-        if (dom.dock && (node === dom.dock || dom.dock.contains(node))) return false;
-        return (node.matches && node.matches(".n-layout-sider, .n-layout-sider-scroll-container, .n-menu, .n-drawer, .n-menu-item, .n-menu-item-group-title"))
-          || (node.querySelector && node.querySelector(".n-layout-sider, .n-layout-sider-scroll-container, .n-menu, .n-drawer, .n-menu-item, .n-menu-item-group-title"));
-      });
-    });
-  }
+  var mountTimer = 0;
+  var topupPollTimer = 0;
 
   function buildTextCatalog() {
     var base = {
       "zh-CN": {
         wallet: "钱包",
-        checkin: "签到",
-        topup: "充值",
+        checkin: "每日签到",
+        topup: "余额充值",
         renew: "自动续费",
-        title: "WalletCenter",
-        subtitle: "集中查看余额、签到、充值和自动续费状态。",
+        title: "钱包扩展",
+        subtitle: "签到、充值和余额自动续费。",
         refresh: "刷新",
-        back: "返回",
-        loading: "正在加载钱包数据",
-        login: "当前未检测到登录状态，请先登录。",
+        loading: "正在加载",
+        login: "请先登录。",
         toLogin: "去登录",
         balance: "账户余额",
         plan: "当前套餐",
@@ -401,7 +63,7 @@
         history: "历史记录",
         disabledFeature: "该功能当前未启用。",
         empty: "暂无数据",
-        refreshHint: "支付完成后会自动同步结果，也可手动刷新。",
+        refreshHint: "支付完成后会自动同步结果。",
         topupCreated: "充值订单已创建，即将跳转支付。",
         checkinOk: "签到成功，奖励已入账。",
         renewOk: "自动续费设置已更新。",
@@ -411,23 +73,29 @@
         fee: "手续费",
         confirmClaim: "确认领取今日签到奖励？",
         confirmTopup: "确认创建充值订单并跳转支付？",
-        confirmRenewOn: "确认开启余额自动续费？系统将通过官方订单开通。",
+        confirmRenewOn: "确认开启余额自动续费？续费将创建官方订单。",
         confirmRenewOff: "确认关闭自动续费？",
         polling: "正在同步支付结果…",
         streak: "连续签到",
-        notice: "说明"
+        notice: "说明",
+        page: "页",
+        prev: "上一页",
+        nextPage: "下一页",
+        filter: "筛选",
+        exportCsv: "导出 CSV",
+        all: "全部",
+        officialWallet: "我的钱包"
       },
       "en-US": {
         wallet: "Wallet",
         checkin: "Daily check-in",
         topup: "Balance top-up",
         renew: "Auto renew",
-        title: "WalletCenter",
-        subtitle: "Review balance, daily check-in, balance top-up and auto renew status in one place.",
+        title: "Wallet extras",
+        subtitle: "Check-in, top-up and balance auto-renew.",
         refresh: "Refresh",
-        back: "Back",
-        loading: "Loading wallet data",
-        login: "No authenticated session was detected. Please log in first.",
+        loading: "Loading",
+        login: "Please log in first.",
         toLogin: "Go to login",
         balance: "Balance",
         plan: "Current plan",
@@ -451,7 +119,7 @@
         history: "History",
         disabledFeature: "This feature is currently disabled.",
         empty: "No data",
-        refreshHint: "Payment results sync automatically. You can also refresh manually.",
+        refreshHint: "Payment results sync automatically.",
         topupCreated: "Top-up order created. Redirecting to payment.",
         checkinOk: "Check-in succeeded.",
         renewOk: "Auto renew setting updated.",
@@ -465,7 +133,14 @@
         confirmRenewOff: "Disable auto-renew?",
         polling: "Syncing payment result…",
         streak: "Streak",
-        notice: "Note"
+        notice: "Note",
+        page: "Page",
+        prev: "Previous",
+        nextPage: "Next",
+        filter: "Filter",
+        exportCsv: "Export CSV",
+        all: "All",
+        officialWallet: "My Wallet"
       }
     };
     var extra = EXTRA_I18N.wallet || {};
@@ -474,7 +149,7 @@
       out[locale] = Object.assign({}, base[locale], extra[locale] || {});
     });
     Object.keys(extra).forEach(function (locale) {
-      out[locale] = Object.assign({}, out[locale] || base["en-US"], extra[locale] || {});
+      out[locale] = Object.assign({}, base["en-US"], out[locale] || {}, extra[locale] || {});
     });
     return out;
   }
@@ -508,14 +183,7 @@
   }
 
   function detectLocale() {
-    return normalizeLocale(
-      readStoredLocale() ||
-      localStorage.getItem("locale") ||
-      localStorage.getItem("lang") ||
-      document.documentElement.lang ||
-      navigator.language ||
-      "en-US"
-    );
+    return normalizeLocale(readStoredLocale() || document.documentElement.lang || navigator.language || "en-US");
   }
 
   function localeMessages(locale) {
@@ -526,22 +194,9 @@
     return RTL_LOCALES.indexOf(normalizeLocale(locale)) !== -1;
   }
 
-  function applyLocaleDirection(locale) {
-    if (typeof window.__xboardCustomApplyLocaleDirection === "function") {
-      window.__xboardCustomApplyLocaleDirection(normalizeLocale(locale));
-      return;
-    }
-    document.documentElement.lang = normalizeLocale(locale);
-    document.documentElement.dir = isRtlLocale(locale) ? "rtl" : "ltr";
-  }
-
   function t(key) {
     var current = localeMessages(state.locale);
     return current[key] || text["en-US"][key] || key;
-  }
-
-  function intlLocale() {
-    return normalizeLocale(state.locale);
   }
 
   function esc(value) {
@@ -549,8 +204,7 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+      .replace(/"/g, "&quot;");
   }
 
   function parseHash(hash) {
@@ -558,157 +212,63 @@
     var arr = raw.split("?");
     var path = arr[0] || "/";
     if (path.charAt(0) !== "/") path = "/" + path;
+    if (path.length > 1) path = path.replace(/\/+$/, "");
     var q = new URLSearchParams(arr[1] || "");
     return {
       path: path,
-      isWallet: path === "/wallet" || q.get("xc_wallet") === "1",
+      isWallet: path === OFFICIAL_PATH || path === "/wallet" || q.get("xc_wallet") === "1",
       section: q.get("section") || "",
       tradeNo: q.get("topup_trade_no") || ""
     };
   }
 
+  function readLastTopupTradeNo() {
+    try {
+      return sessionStorage.getItem(LAST_TOPUP) || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
   function canonicalizeWalletHash() {
     var parsed = parseHash(location.hash);
+    var lastTopup = readLastTopupTradeNo();
     var shouldRecover = parsed.path === "/wallet"
-      || (parsed.path === "/404" && !!parsed.tradeNo);
+      || (parsed.path === "/dashboard" && (parsed.section || parsed.tradeNo || location.hash.indexOf("xc_wallet=1") !== -1));
+    if (parsed.path === "/404" && (parsed.tradeNo || lastTopup)) shouldRecover = true;
     if (!shouldRecover) return;
-    var tradeNo = parsed.tradeNo;
-    var next = "#/dashboard?xc_wallet=1";
+    var next = "#" + OFFICIAL_PATH;
+    var params = [];
+    var tradeNo = parsed.tradeNo || lastTopup;
     var section = parsed.section || (tradeNo ? "topup" : "");
-    if (section) next += "&section=" + encodeURIComponent(section);
-    if (tradeNo) next += "&topup_trade_no=" + encodeURIComponent(tradeNo);
+    if (section) params.push("section=" + encodeURIComponent(section));
+    if (tradeNo) params.push("topup_trade_no=" + encodeURIComponent(tradeNo));
+    if (params.length) next += "?" + params.join("&");
     if (location.hash !== next) {
       history.replaceState(null, "", location.pathname + location.search + next);
     }
   }
 
   function isAuthPath(path) {
-    return path === "/login"
-      || path === "/register"
-      || path === "/forgot"
-      || path === "/forget"
-      || path.indexOf("/reset") === 0
-      || path.indexOf("/password") === 0;
-  }
-
-  function shouldShowDock() {
-    var walletConfig = state.comm && state.comm.wallet_center;
-    if (walletConfig && walletConfig.enabled === false) return false;
-    return (!!state.token || state.authed === true) && !isAuthPath(state.route.path);
-  }
-
-  function isMobileViewport() {
-    return window.innerWidth <= 720;
-  }
-
-  function isAppShellReady() {
-    var appRoot = document.getElementById("app");
-    if (appRoot && appRoot.childElementCount > 0) return true;
-    return !!document.querySelector(".n-layout, .n-layout-header, .n-layout-content, .n-layout-sider, .n-drawer");
-  }
-
-  function resolveDockDisplayState(options) {
-    var input = options || {};
-    if (!input.allowDock) {
-      return { mode: "floating", visible: false, probe: false, floatingAllowed: false };
-    }
-    if (input.hasSidebar) {
-      return { mode: "sidebar", visible: true, probe: false, floatingAllowed: false };
-    }
-    if (input.isWalletRoute) {
-      return { mode: "floating", visible: true, probe: false, floatingAllowed: true };
-    }
-    if (input.isMobile) {
-      return { mode: "floating", visible: true, probe: true, floatingAllowed: true };
-    }
-    return { mode: "floating", visible: false, probe: !!input.shellReady, floatingAllowed: false };
-  }
-
-  function updateDockRuntimeFlags(mode, floatingAllowed) {
-    if (!document.body) return;
-    document.body.dataset.xcWalletDockMode = mode || "floating";
-    document.body.dataset.xcWalletFloatingAllowed = floatingAllowed ? "true" : "false";
-    document.body.dataset.xcWalletRoute = state.route.isWallet ? "true" : "false";
-  }
-
-  function getDockRenderSignature(mode, dockVisible, collapsed) {
-    return [
-      mode,
-      dockVisible ? "1" : "0",
-      collapsed ? "1" : "0",
-      getDockActiveKey(),
-      state.locale
-    ].join("|");
-  }
-
-  function isDockRenderStable(mode, parent, signature) {
-    return dockRenderState.mode === mode
-      && dockRenderState.parent === parent
-      && dockRenderState.signature === signature;
-  }
-
-  function setDockRenderState(mode, parent, signature) {
-    dockRenderState.mode = mode;
-    dockRenderState.parent = parent;
-    dockRenderState.signature = signature;
-  }
-
-  function clearDockProbe() {
-    if (dockProbeTimer) {
-      clearTimeout(dockProbeTimer);
-      dockProbeTimer = 0;
-    }
-    dockProbeAttempts = 0;
-  }
-
-  function scheduleDockProbe() {
-    if (dockProbeTimer || !shouldShowDock() || dockProbeAttempts >= MAX_DOCK_PROBE_ATTEMPTS) return;
-    dockProbeAttempts += 1;
-    dockProbeTimer = setTimeout(function () {
-      dockProbeTimer = 0;
-      scheduleDockSync();
-      if (!getSidebarMenuRoot()) scheduleDockProbe();
-    }, DOCK_PROBE_DELAY);
-  }
-
-  function clearAuthProbe() {
-    if (authProbeTimer) {
-      clearTimeout(authProbeTimer);
-      authProbeTimer = 0;
-    }
-    authProbeAttempts = 0;
-  }
-
-  function scheduleAuthProbe() {
-    if (authProbeTimer || isAuthPath(state.route.path) || authProbeAttempts >= MAX_AUTH_PROBE_ATTEMPTS) return;
-    authProbeAttempts += 1;
-    authProbeTimer = setTimeout(function () {
-      authProbeTimer = 0;
-      load(false);
-    }, AUTH_PROBE_DELAY);
-  }
-
-  function badge(label, tone) {
-    return '<div class="xc-wallet-badge"' + (tone ? ' data-tone="' + esc(tone) + '"' : "") + ">" + esc(label) + "</div>";
+    return path === "/login" || path === "/register" || path === "/forgot" || path === "/forget" || path.indexOf("/reset") === 0;
   }
 
   function money(value) {
     var n = Number(value || 0) / 100;
     var symbol = state.comm && state.comm.currency_symbol ? state.comm.currency_symbol + " " : "";
-    var code = state.comm && state.comm.currency ? " " + state.comm.currency : "";
     try {
-      return symbol + n.toLocaleString(intlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + code;
+      return symbol + n.toLocaleString(normalizeLocale(state.locale), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } catch (error) {
-      return symbol + n.toFixed(2) + code;
+      return symbol + n.toFixed(2);
     }
   }
 
   function time(value) {
     if (!value) return "--";
     var date = typeof value === "number" ? new Date(value * 1000) : new Date(value);
-    if (Number.isNaN(date.getTime())) return esc(value);
+    if (Number.isNaN(date.getTime())) return String(value);
     try {
-      return date.toLocaleString(intlLocale());
+      return date.toLocaleString(normalizeLocale(state.locale));
     } catch (error) {
       return date.toLocaleString("en-US");
     }
@@ -726,12 +286,10 @@
         return /^Bearer /i.test(parsed.auth_data) ? parsed.auth_data : "Bearer " + parsed.auth_data;
       }
     } catch (error) {
-      var text = String(raw).trim();
-      var match = text.match(/Bearer\s+[A-Za-z0-9._-]+/i);
+      var textValue = String(raw).trim();
+      var match = textValue.match(/Bearer\s+[A-Za-z0-9._-]+/i);
       if (match) return "Bearer " + match[0].replace(/^Bearer\s+/i, "").trim();
-      if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(text)) {
-        return "Bearer " + text;
-      }
+      if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(textValue)) return "Bearer " + textValue;
     }
     return null;
   }
@@ -748,34 +306,6 @@
       }
     }
     return null;
-  }
-
-  function remember() {
-    if (!state.route.isWallet) sessionStorage.setItem(PREV, location.hash || DEFAULT_HASH);
-  }
-
-  function openWallet(section) {
-    remember();
-    var base = state.route.path && state.route.path !== "/404" && state.route.path !== "/login" ? state.route.path : "/dashboard";
-    var hash = "#" + base + "?xc_wallet=1";
-    if (section) hash += "&section=" + encodeURIComponent(section);
-    location.hash = hash;
-  }
-
-  function closeWallet() {
-    var prev = sessionStorage.getItem(PREV) || DEFAULT_HASH;
-    if (parseHash(prev).isWallet) prev = DEFAULT_HASH;
-    location.hash = prev;
-  }
-
-  function toast(message, tone) {
-    ensureToastHost();
-    var el = document.createElement("div");
-    el.className = "xc-wallet-toast";
-    if (tone) el.dataset.tone = tone;
-    el.textContent = message;
-    dom.toast.appendChild(el);
-    setTimeout(function () { el.remove(); }, 3200);
   }
 
   function headers(method) {
@@ -815,200 +345,284 @@
     }
   }
 
-  function ensureDockHost() {
-    if (dom.dock) return;
-    dom.dock = document.createElement("div");
-    dom.dock.className = "xc-wallet-dock xc-wallet-dock--floating";
-    dom.dock.addEventListener("click", onClick);
-    document.body.appendChild(dom.dock);
-  }
-
-  function ensureWalletLayer() {
-    if (dom.overlay) return;
-    dom.overlay = document.createElement("div");
-    dom.overlay.className = "xc-wallet-overlay";
-    dom.overlay.setAttribute("role", "dialog");
-    dom.overlay.setAttribute("aria-modal", "true");
-    dom.overlay.setAttribute("aria-label", t("title"));
-    dom.overlay.addEventListener("click", onClick);
-    dom.shell = document.createElement("div");
-    dom.shell.className = "xc-wallet-shell";
-    dom.overlay.appendChild(dom.shell);
-    document.body.appendChild(dom.overlay);
+  function toast(message, tone) {
+    ensureToastHost();
+    var el = document.createElement("div");
+    el.className = "n-message n-message--" + (tone || "info") + " xc-wallet-toast";
+    el.textContent = message;
+    dom.toast.appendChild(el);
+    setTimeout(function () { el.remove(); }, 3200);
   }
 
   function ensureToastHost() {
     if (dom.toast) return;
     dom.toast = document.createElement("div");
-    dom.toast.className = "xc-wallet-toast-stack";
+    dom.toast.className = "n-message-container xc-wallet-toast-stack";
     document.body.appendChild(dom.toast);
+  }
+
+  function ensurePanel() {
+    if (dom.panel) return;
+    dom.panel = document.createElement("section");
+    dom.panel.className = "n-card n-card--bordered xc-wallet-panel rounded-md";
+    dom.panel.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
+    dom.panel.addEventListener("click", onClick);
+    dom.panel.addEventListener("change", onChange);
+  }
+
+  function findOfficialWalletCard() {
+    var nodes = document.querySelectorAll(".n-card-header__main, .n-card-header");
+    for (var i = 0; i < nodes.length; i += 1) {
+      var label = (nodes[i].textContent || "").trim();
+      if (!label) continue;
+      if (label.indexOf(t("officialWallet")) !== -1 || /钱包|Wallet|portefeuille|Portemonnaie|billetera|portafoglio|carteira|portemonnee|portfel|Cüzdan|кошел|محفظ|lommebok|plånbok|lompakko|財布|지갑|Ví|کیف/i.test(label)) {
+        return nodes[i].closest(".n-card");
+      }
+    }
+    return null;
+  }
+
+  function findContentHost() {
+    return document.querySelector(".n-layout-content .n-spin-content")
+      || document.querySelector(".n-layout-content")
+      || document.getElementById("app");
+  }
+
+  function mountPanel() {
+    ensurePanel();
+    if (!state.route.isWallet || isAuthPath(state.route.path)) {
+      if (dom.panel.parentElement) dom.panel.remove();
+      return;
+    }
+    var card = findOfficialWalletCard();
+    if (card && card.parentElement) {
+      if (dom.panel.previousElementSibling !== card) {
+        card.insertAdjacentElement("afterend", dom.panel);
+      }
+      return true;
+    }
+    var host = findContentHost();
+    if (host && dom.panel.parentElement !== host) {
+      host.appendChild(dom.panel);
+    }
+    return !!card;
   }
 
   function onClick(event) {
     var btn = event.target.closest("[data-xc]");
     if (!btn) return;
-    runDockAction(btn.dataset.xc, btn.dataset.section, btn.dataset.enabled);
+    var action = btn.getAttribute("data-xc");
+    if (action === "refresh") load(true);
+    if (action === "login") location.hash = "#/login";
+    if (action === "claim") claim();
+    if (action === "topup") createTopup();
+    if (action === "renew") toggleRenew(btn.getAttribute("data-enabled") === "1");
+    if (action === "page") {
+      var key = btn.getAttribute("data-key");
+      var page = Number(btn.getAttribute("data-page") || 1);
+      if (key) {
+        state.pages[key] = page;
+        load(true);
+      }
+    }
+    if (action === "export") exportCsv(btn.getAttribute("data-key"));
+    if (action === "section") {
+      var section = btn.getAttribute("data-section") || "";
+      var hash = "#" + OFFICIAL_PATH + (section ? "?section=" + encodeURIComponent(section) : "");
+      location.hash = hash;
+    }
   }
 
-  function layout(inner) {
-    return ''
-      + '<div class="xc-wallet-header">'
-      + '<div class="xc-wallet-title"><h1>' + esc(t("title")) + '</h1><p>' + esc(t("subtitle")) + "</p></div>"
-      + '<div class="xc-wallet-actions">'
-      + '<button type="button" data-xc="refresh" data-variant="ghost">' + esc(t("refresh")) + "</button>"
-      + '<button type="button" data-xc="close">' + esc(t("back")) + "</button>"
-      + "</div></div>"
-      + inner;
+  function onChange(event) {
+    var el = event.target;
+    if (!el || !el.getAttribute) return;
+    if (el.getAttribute("data-xc") === "filter") {
+      var key = el.getAttribute("data-key");
+      if (key) {
+        state.filters[key] = el.value || "all";
+        state.pages[key] = 1;
+        load(true);
+      }
+    }
   }
 
-  function card(id, title, desc, body, span) {
-    return '<section class="xc-wallet-card" id="xc-section-' + esc(id) + '" data-span="' + esc(span || "4") + '"><h2>' + esc(title) + "</h2><p>" + esc(desc) + "</p>" + body + "</section>";
+  function nButton(label, attrs, type) {
+    var extra = attrs || "";
+    var kind = type || "default";
+    return '<button type="button" class="n-button n-button--' + kind + '-type n-button--medium-type" ' + extra + "><span class=\"n-button__content\">" + esc(label) + "</span></button>";
   }
 
-  function list(items) {
-    return items && items.length
-      ? '<div class="xc-wallet-list">' + items.join("") + "</div>"
-      : '<div class="xc-wallet-empty"><p>' + esc(t("empty")) + "</p></div>";
-  }
-
-  function item(title, lines, badgeHtml) {
-    return '<div class="xc-wallet-list-item"><div><strong>' + esc(title) + "</strong>" + lines.map(function (line) {
-      return "<span>" + esc(line) + "</span>";
-    }).join("") + "</div><div>" + (badgeHtml || "") + "</div></div>";
+  function nTag(label, type) {
+    return '<span class="n-tag n-tag--' + (type || "default") + '">' + esc(label) + "</span>";
   }
 
   function isFeatureDisabled(error) {
     if (!error) return false;
     if (error.status === 403) return true;
-    var message = String(error.message || "");
-    return /disabled/i.test(message) || /未启用|未开启|禁用/.test(message);
+    return /disabled|未启用|未开启/i.test(String(error.message || ""));
   }
 
-  function applyThemeTokens() {
-    var color = (window.settings && window.settings.theme && window.settings.theme.color) || "default";
-    var map = {
-      default: "#16a34a",
-      blue: "#2563eb",
-      black: "#0f172a",
-      darkblue: "#1d4ed8"
+  function pager(key, pack) {
+    var page = Number((pack && pack.page) || state.pages[key] || 1);
+    var last = Number((pack && pack.last_page) || 1);
+    var total = Number((pack && pack.total) || 0);
+    return '<div class="n-pagination xc-wallet-pager" dir="' + (isRtlLocale(state.locale) ? "rtl" : "ltr") + '">'
+      + nButton(t("prev"), 'data-xc="page" data-key="' + key + '" data-page="' + Math.max(1, page - 1) + '"' + (page <= 1 ? " disabled" : ""))
+      + '<span class="xc-wallet-pager__info">' + esc(t("page")) + " " + page + " / " + last + " · " + total + "</span>"
+      + nButton(t("nextPage"), 'data-xc="page" data-key="' + key + '" data-page="' + Math.min(last, page + 1) + '"' + (page >= last ? " disabled" : ""))
+      + nButton(t("exportCsv"), 'data-xc="export" data-key="' + key + '"', "primary")
+      + "</div>";
+  }
+
+  function listItems(items) {
+    if (!items || !items.length) {
+      return '<div class="n-empty"><div class="n-empty__description">' + esc(t("empty")) + "</div></div>";
+    }
+    return '<div class="n-list">' + items.join("") + "</div>";
+  }
+
+  function paymentIcon(method) {
+    var icon = method && method.icon;
+    if (!icon) return "";
+    if (/^https?:\/\//i.test(icon) || icon.indexOf("/") === 0 || icon.indexOf("data:") === 0) {
+      return '<img class="xc-wallet-pay-icon" alt="" src="' + esc(icon) + '" />';
+    }
+    return '<span class="xc-wallet-pay-icon xc-wallet-pay-icon--text">' + esc(icon) + "</span>";
+  }
+
+  function captureDraft() {
+    if (!dom.panel) return { amount: "", payment: 0 };
+    return {
+      amount: (dom.panel.querySelector("#xc-topup-amount") || {}).value || "",
+      payment: paymentId()
     };
-    document.documentElement.style.setProperty("--xc-accent", map[color] || map.default);
-    document.documentElement.style.setProperty("--xc-accent-soft", (color === "black" ? "rgba(255,255,255,0.12)" : "rgba(22, 163, 74, 0.12)"));
-    if (document.body) {
-      document.body.dataset.xcTheme = color;
-      document.body.classList.toggle("xc-theme-dark", color === "black");
+  }
+
+  function restoreDraft(draft) {
+    if (!dom.panel || !draft) return;
+    var input = dom.panel.querySelector("#xc-topup-amount");
+    if (input && draft.amount) input.value = draft.amount;
+    if (draft.payment) {
+      var radio = dom.panel.querySelector('input[name="xc_topup"][value="' + String(draft.payment) + '"]');
+      if (radio) radio.checked = true;
     }
   }
 
   function render() {
-    ensureDockHost();
     applyThemeTokens();
-    applyLocaleDirection(state.locale);
-    renderDock();
-    if (state.route.isWallet) {
-      ensureWalletLayer();
+    if (typeof window.__xboardCustomApplyLocaleDirection === "function") {
+      window.__xboardCustomApplyLocaleDirection(normalizeLocale(state.locale));
     }
-    if (dom.overlay) {
-      dom.overlay.dataset.open = state.route.isWallet ? "true" : "false";
-      dom.overlay.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
-      dom.overlay.dataset.locale = intlLocale();
+    if (!state.route.isWallet) {
+      if (dom.panel && dom.panel.parentElement) dom.panel.remove();
+      return;
     }
-    document.body.classList.toggle("xc-wallet-open", state.route.isWallet);
-    document.body.classList.toggle("xc-rtl", isRtlLocale(state.locale));
-    if (!state.route.isWallet) return;
+    var mounted = mountPanel();
+    if (!mounted) scheduleMount();
+    if (!dom.panel) return;
+    var draft = state.loading ? null : captureDraft();
+    dom.panel.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
+
     if (state.loading) {
-      dom.shell.innerHTML = layout('<div class="xc-wallet-empty"><div class="xc-wallet-loading">' + esc(t("loading")) + "</div></div>");
+      dom.panel.innerHTML = '<div class="n-card-header"><div class="n-card-header__main">' + esc(t("title")) + '</div></div><div class="n-card__content"><div class="n-spin-container">' + esc(t("loading")) + "</div></div>";
       return;
     }
     if (!state.authed) {
-      dom.shell.innerHTML = layout('<div class="xc-wallet-empty"><p>' + esc(t("login")) + '</p><div class="xc-wallet-stack"><button type="button" data-xc="login">' + esc(t("toLogin")) + "</button></div></div>");
+      dom.panel.innerHTML = '<div class="n-card-header"><div class="n-card-header__main">' + esc(t("title")) + '</div></div><div class="n-card__content"><p>' + esc(t("login")) + "</p>" + nButton(t("toLogin"), 'data-xc="login"', "primary") + "</div>";
       return;
     }
 
-    var sub = state.subscribe || {};
-    var user = state.user || {};
+    var ck = state.checkin.status || {};
     var topMethods = state.topup.methods || {};
     var autoCfg = state.renew.config || {};
     var autoConfig = autoCfg.config || {};
     var autoSub = autoCfg.subscription || {};
+    var range = topMethods.amount_range || {};
+    var section = state.route.section || "checkin";
 
-    var metrics = ''
-      + '<div class="xc-wallet-card" data-span="12"><div class="xc-wallet-metrics">'
-      + '<div class="xc-wallet-metric"><span>' + esc(t("balance")) + '</span><strong>' + esc(money(user.balance || 0)) + "</strong></div>"
-      + '<div class="xc-wallet-metric"><span>' + esc(t("plan")) + '</span><strong>' + esc((sub.plan && sub.plan.name) || t("none")) + "</strong></div>"
-      + '<div class="xc-wallet-metric"><span>' + esc(t("expire")) + '</span><strong>' + esc(sub.expired_at ? time(Number(sub.expired_at)) : "--") + "</strong></div>"
-      + '<div class="xc-wallet-metric"><span>' + esc(t("renewStatus")) + '</span><strong>' + esc(autoConfig.enabled ? t("statusEnabled") : t("statusDisabled")) + "</strong></div>"
-      + "</div></div>";
+    var tabs = ["checkin", "topup", "renew"].map(function (key) {
+      var active = section === key ? " n-button--primary-type" : " n-button--default-type";
+      return '<button type="button" class="n-button n-button--medium-type' + active + '" data-xc="section" data-section="' + key + '"><span class="n-button__content">' + esc(t(key)) + "</span></button>";
+    }).join("");
 
-    var ck = state.checkin.status || {};
-    var ckh = (state.checkin.history && state.checkin.history.records) || [];
     var checkinBody = isFeatureDisabled(state.checkin.error)
-      ? '<div class="xc-wallet-stack">' + badge(t("disabledFeature"), "warning") + "</div>"
-      : '<div class="xc-wallet-stack">'
-        + badge(ck.today_claimed ? t("claimed") : t("claim"), ck.today_claimed ? "success" : "warning")
-        + (ck.notice ? "<p>" + esc(ck.notice) + "</p>" : "")
+      ? nTag(t("disabledFeature"), "warning")
+      : '<p>' + esc(ck.notice || t("notice")) + "</p>"
         + "<p>" + esc(t("range")) + ": " + esc(money((ck.reward_range || {}).min || 0)) + " ~ " + esc(money((ck.reward_range || {}).max || 0)) + "</p>"
         + (ck.streak_days ? "<p>" + esc(t("streak")) + ": " + esc(String(ck.streak_days)) + "</p>" : "")
-        + '<button type="button" data-xc="claim"' + (ck.today_claimed ? " disabled" : "") + ' data-variant="success">' + esc(ck.today_claimed ? t("claimed") : t("claim")) + "</button>"
-        + "</div>";
+        + nButton(ck.today_claimed ? t("claimed") : t("claim"), 'data-xc="claim"' + (ck.today_claimed ? " disabled" : ""), ck.today_claimed ? "default" : "primary");
 
-    var range = topMethods.amount_range || {};
     var methods = (topMethods.payment_channels || []).map(function (method, index) {
       var feeParts = [];
       if (Number(method.handling_fee_percent)) feeParts.push(Number(method.handling_fee_percent) + "%");
       if (Number(method.handling_fee_fixed)) feeParts.push(money(method.handling_fee_fixed));
-      var feeText = feeParts.length ? t("fee") + ": " + feeParts.join(" + ") : "";
-      return '<label class="xc-wallet-radio"><div><strong>' + esc(method.name || method.payment || "Payment") + '</strong><span>' + esc(method.payment || "") + (feeText ? " · " + esc(feeText) : "") + '</span></div><input type="radio" name="xc_topup" value="' + esc(String(method.id)) + '"' + (index === 0 ? " checked" : "") + " /></label>";
+      var checked = index === 0 ? " checked" : "";
+      return '<label class="n-radio-wrapper xc-wallet-pay">'
+        + '<input class="n-radio" type="radio" name="xc_topup" value="' + esc(String(method.id)) + '"' + checked + " />"
+        + paymentIcon(method)
+        + '<span><strong>' + esc(method.name || method.payment || "Payment") + "</strong><small>" + esc(method.payment || "") + (feeParts.length ? " · " + esc(t("fee") + ": " + feeParts.join(" + ")) : "") + "</small></span>"
+        + "</label>";
     }).join("");
+
     var topupBody = isFeatureDisabled(state.topup.error)
-      ? '<div class="xc-wallet-stack">' + badge(t("disabledFeature"), "warning") + "</div>"
-      : '<div class="xc-wallet-form"><input id="xc-topup-amount" class="xc-wallet-input" inputmode="decimal" placeholder="' + esc((range.min ? (Number(range.min) / 100).toString() : "25")) + '" /><p>' + esc(t("amountMin")) + ": " + esc(money(range.min || 0)) + " · " + esc(t("amountMax")) + ": " + esc(money(range.max || 0)) + "</p><p>" + esc(t("refreshHint")) + '</p><div class="xc-wallet-radio-list">' + methods + '</div><button type="button" data-xc="topup">' + esc(t("create")) + "</button></div>";
+      ? nTag(t("disabledFeature"), "warning")
+      : '<div class="n-input n-input--resizable"><input id="xc-topup-amount" class="n-input__input-el" inputmode="decimal" placeholder="' + esc((range.min ? String(Number(range.min) / 100) : "10")) + '" /></div>'
+        + "<p>" + esc(t("amountMin")) + ": " + esc(money(range.min || 0)) + " · " + esc(t("amountMax")) + ": " + esc(money(range.max || 0)) + "</p>"
+        + "<p>" + esc(t("refreshHint")) + "</p>"
+        + '<div class="n-radio-group">' + methods + "</div>"
+        + nButton(t("create"), 'data-xc="topup"', "primary");
 
     var renewBody = isFeatureDisabled(state.renew.error)
-      ? '<div class="xc-wallet-stack">' + badge(t("disabledFeature"), "warning") + "</div>"
-      : '<div class="xc-wallet-stack">'
-        + badge(autoConfig.enabled ? t("statusEnabled") : t("statusDisabled"), autoConfig.enabled ? "success" : "warning")
+      ? nTag(t("disabledFeature"), "warning")
+      : nTag(autoConfig.enabled ? t("statusEnabled") : t("statusDisabled"), autoConfig.enabled ? "success" : "warning")
         + "<p>" + esc(t("amount")) + ": " + esc(money(autoSub.amount || 0)) + "</p>"
         + "<p>" + esc(t("next")) + ": " + esc(autoConfig.next_scan_at ? time(autoConfig.next_scan_at) : "--") + "</p>"
         + "<p>" + esc(t("result")) + ": " + esc(autoConfig.last_result || t("none")) + "</p>"
-        + '<button type="button" data-xc="renew" data-enabled="' + (autoConfig.enabled ? "1" : "0") + '" data-variant="' + (autoConfig.enabled ? "ghost" : "success") + '">' + esc(autoConfig.enabled ? t("disableAction") : t("enableAction")) + "</button>"
-        + "</div>";
+        + nButton(autoConfig.enabled ? t("disableAction") : t("enableAction"), 'data-xc="renew" data-enabled="' + (autoConfig.enabled ? "1" : "0") + '"', autoConfig.enabled ? "default" : "primary");
 
-    var ckItems = ckh.slice(0, 20).map(function (record) {
-      return item(record.claim_date || "--", [t("amount") + ": " + money(record.reward_amount || 0)], badge("success"));
+    var ckPack = state.checkin.history || {};
+    var topPack = state.topup.history || {};
+    var renewPack = state.renew.history || {};
+    var ckItems = (ckPack.records || []).map(function (record) {
+      return '<div class="n-list-item"><div class="n-list-item__main">' + esc(record.claim_date || "--") + " · " + esc(money(record.reward_amount || 0)) + "</div></div>";
     });
-    var topItems = (((state.topup.history || {}).records) || []).slice(0, 20).map(function (record) {
-      var tone = /paid/i.test(record.status_label || "") ? "success" : /expired|cancelled/i.test(record.status_label || "") ? "danger" : "warning";
-      return item(record.trade_no || "--", [t("amount") + ": " + money(record.amount || 0), t("latest") + ": " + time(record.created_at)], badge(record.status_label || "--", tone));
+    var topItems = (topPack.records || []).map(function (record) {
+      return '<div class="n-list-item"><div class="n-list-item__main">' + esc(record.trade_no || "--") + " · " + esc(money(record.amount || 0)) + "</div>" + nTag(record.status_label || "--") + "</div>";
     });
-    if (state.topup.detail && state.topup.detail.order) {
-      topItems.unshift(item(
-        (state.topup.detail.order.trade_no || "--") + " *",
-        [t("amount") + ": " + money(state.topup.detail.order.amount || 0), t("result") + ": " + (state.topup.detail.order.status_label || "--")],
-        badge(state.topup.detail.order.status_label || "--")
-      ));
-    }
-    var renewItems = (((state.renew.history || {}).records) || []).slice(0, 20).map(function (record) {
-      var tone = /success/i.test(record.status_label || "") ? "success" : /failed/i.test(record.status_label || "") ? "danger" : "warning";
-      return item(record.status_label || "--", [t("amount") + ": " + money(record.amount || 0), t("reason") + ": " + (record.reason_message || record.reason || "--")], badge(record.status_label || "--", tone));
+    var renewItems = (renewPack.records || []).map(function (record) {
+      return '<div class="n-list-item"><div class="n-list-item__main">' + esc(record.status_label || "--") + " · " + esc(money(record.amount || 0)) + "</div><small>" + esc(record.reason_message || record.reason || "--") + "</small></div>";
     });
 
-    dom.shell.innerHTML = layout(
-      '<div class="xc-wallet-grid">'
-      + metrics
-      + card("checkin", t("checkin"), t("subtitle"), checkinBody, "4")
-      + card("topup", t("topup"), t("methods"), topupBody, "4")
-      + card("renew", t("renew"), t("renewStatus"), renewBody, "4")
-      + card("checkin-history", t("history"), t("checkin"), list(ckItems), "6")
-      + card("topup-history", t("history"), t("topup"), list(topItems), "6")
-      + card("renew-history", t("history"), t("renew"), list(renewItems), "12")
-      + "</div>"
-    );
+    var filter = function (key) {
+      return '<label class="xc-wallet-filter">' + esc(t("filter")) + ' <select class="n-base-selection" data-xc="filter" data-key="' + key + '">'
+        + '<option value="all"' + (state.filters[key] === "all" ? " selected" : "") + ">" + esc(t("all")) + "</option>"
+        + '<option value="paid"' + (state.filters[key] === "paid" ? " selected" : "") + ">paid</option>"
+        + '<option value="pending"' + (state.filters[key] === "pending" ? " selected" : "") + ">pending</option>"
+        + '<option value="expired"' + (state.filters[key] === "expired" ? " selected" : "") + ">expired</option>"
+        + '<option value="success"' + (state.filters[key] === "success" ? " selected" : "") + ">success</option>"
+        + '<option value="failed"' + (state.filters[key] === "failed" ? " selected" : "") + ">failed</option>"
+        + "</select></label>";
+    };
 
-    if (state.route.section) {
-      var sec = document.getElementById("xc-section-" + state.route.section);
-      if (sec) requestAnimationFrame(function () { sec.scrollIntoView({ behavior: "smooth", block: "start" }); });
-    }
+    var bodies = {
+      checkin: checkinBody + "<h4>" + esc(t("history")) + "</h4>" + listItems(ckItems) + pager("checkin", ckPack),
+      topup: topupBody + "<h4>" + esc(t("history")) + "</h4>" + filter("topup") + listItems(topItems) + pager("topup", topPack),
+      renew: renewBody + "<h4>" + esc(t("history")) + "</h4>" + filter("renew") + listItems(renewItems) + pager("renew", renewPack)
+    };
+
+    dom.panel.innerHTML = ""
+      + '<div class="n-card-header"><div class="n-card-header__main">' + esc(t("title")) + '</div><div class="n-card-header__extra">' + nButton(t("refresh"), 'data-xc="refresh"') + "</div></div>"
+      + '<div class="n-card__content">'
+      + '<p class="n-card__footer">' + esc(t("subtitle")) + "</p>"
+      + '<div class="n-button-group xc-wallet-tabs">' + tabs + "</div>"
+      + '<div class="xc-wallet-section" id="xc-section-' + esc(section) + '">' + (bodies[section] || bodies.checkin) + "</div>"
+      + "</div>";
+    restoreDraft(draft);
+  }
+
+  function applyThemeTokens() {
+    var color = (window.settings && window.settings.theme && window.settings.theme.color) || "default";
+    if (document.body) document.body.dataset.xcTheme = color;
   }
 
   function amountCents(value) {
@@ -1017,7 +631,7 @@
   }
 
   function paymentId() {
-    var el = dom.shell.querySelector('input[name="xc_topup"]:checked');
+    var el = dom.panel && dom.panel.querySelector('input[name="xc_topup"]:checked');
     return el ? Number(el.value) : 0;
   }
 
@@ -1033,17 +647,22 @@
   }
 
   async function createTopup() {
-    var amount = amountCents((dom.shell.querySelector("#xc-topup-amount") || {}).value || "");
+    var amount = amountCents((dom.panel.querySelector("#xc-topup-amount") || {}).value || "");
     var payment = paymentId();
     if (!amount || !payment) return toast(t("failed"), "error");
     if (!window.confirm(t("confirmTopup"))) return;
     try {
       var res = await api("/api/v1/wallet-center/topup/create", { method: "POST", body: { payment_id: payment, amount: amount } });
-      if (res && res.order && res.order.trade_no) sessionStorage.setItem(LAST_TOPUP, res.order.trade_no);
+      if (res && res.order && res.order.trade_no) {
+        try { sessionStorage.setItem(LAST_TOPUP, res.order.trade_no); } catch (error) {}
+      }
       toast(t("topupCreated"), "success");
       if (res && res.payment_result && Number(res.payment_result.type) === 1 && res.payment_result.data) {
-        location.href = res.payment_result.data;
-        return;
+        var payUrl = String(res.payment_result.data);
+        if (/^https?:\/\//i.test(payUrl)) {
+          location.href = payUrl;
+          return;
+        }
       }
     } catch (error) {
       toast(error.message || t("failed"), "error");
@@ -1062,80 +681,92 @@
     load(true);
   }
 
+  function csvCell(value) {
+    var text = String(value == null ? "" : value);
+    if (/[",\n\r]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
+    return text;
+  }
+
+  function exportCsv(key) {
+    var pack = key === "topup" ? state.topup.history : key === "renew" ? state.renew.history : state.checkin.history;
+    var rows = (pack && pack.records) || [];
+    var csv = rows.map(function (record) {
+      return [
+        csvCell(record.trade_no || record.claim_date || record.status_label),
+        csvCell(record.amount || record.reward_amount),
+        csvCell(record.status_label || record.status),
+        csvCell(record.reason_message || "")
+      ].join(",");
+    });
+    csv.unshift("id,amount,status,reason");
+    var blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "wallet-" + key + ".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function historyQuery(key) {
+    var page = state.pages[key] || 1;
+    var status = state.filters[key];
+    var q = "?page=" + page + "&limit=10";
+    if (status && status !== "all") q += "&status=" + encodeURIComponent(status);
+    return q;
+  }
+
   async function load(force) {
     state.locale = detectLocale();
     state.token = token();
     if (!state.token) {
       state.authed = false;
-      state.user = null;
       state.loading = false;
-      scheduleAuthProbe();
       return render();
     }
-    clearAuthProbe();
-    var shouldLoadWallet = state.route.isWallet || force;
-    state.loading = shouldLoadWallet;
-    render();
+    if (!state.route.isWallet && !force) {
+      return render();
+    }
+    var showSpinner = !state.authed || !dom.panel || !dom.panel.parentElement;
+    if (showSpinner) {
+      state.loading = true;
+      render();
+    }
     var rid = ++state.rid;
-    var base = await safe(function () { return api("/api/v1/user/info"); });
-    if (rid !== state.rid) return;
-    if (!base.ok) {
-      state.authed = false;
-      state.user = null;
-      state.loading = false;
-      scheduleAuthProbe();
-      return render();
-    }
-    state.authed = true;
-    state.user = base.data;
-    clearAuthProbe();
-    if (!shouldLoadWallet) {
-      var commOnly = await safe(function () { return api("/api/v1/user/comm/config"); });
-      if (rid !== state.rid) return;
-      if (commOnly.ok) state.comm = commOnly.data;
-      state.loading = false;
-      return render();
-    }
-    var tradeNo = state.route.tradeNo || sessionStorage.getItem(LAST_TOPUP) || "";
+    var tradeNo = state.route.tradeNo || readLastTopupTradeNo();
     var all = await Promise.all([
+      safe(function () { return api("/api/v1/user/info"); }),
       safe(function () { return api("/api/v1/user/getSubscribe"); }),
       safe(function () { return api("/api/v1/user/comm/config"); }),
       safe(function () { return api("/api/v1/wallet-center/checkin/status"); }),
-      safe(function () { return api("/api/v1/wallet-center/checkin/history?limit=20"); }),
+      safe(function () { return api("/api/v1/wallet-center/checkin/history" + historyQuery("checkin")); }),
       safe(function () { return api("/api/v1/wallet-center/topup/methods"); }),
-      safe(function () { return api("/api/v1/wallet-center/topup/history?limit=20"); }),
+      safe(function () { return api("/api/v1/wallet-center/topup/history" + historyQuery("topup")); }),
       safe(function () { return tradeNo ? api("/api/v1/wallet-center/topup/detail?trade_no=" + encodeURIComponent(tradeNo)) : Promise.resolve(null); }),
       safe(function () { return api("/api/v1/wallet-center/auto-renew/config"); }),
-      safe(function () { return api("/api/v1/wallet-center/auto-renew/history?limit=20"); })
+      safe(function () { return api("/api/v1/wallet-center/auto-renew/history" + historyQuery("renew")); })
     ]);
     if (rid !== state.rid) return;
-    state.subscribe = all[0].ok ? all[0].data : null;
-    state.comm = all[1].ok ? all[1].data : null;
-    state.checkin = {
-      status: all[2].ok ? all[2].data : null,
-      history: all[3].ok ? all[3].data : null,
-      error: all[2].ok ? (all[3].ok ? null : all[3].error) : all[2].error
-    };
-    state.topup = {
-      methods: all[4].ok ? all[4].data : null,
-      history: all[5].ok ? all[5].data : null,
-      detail: all[6].ok ? all[6].data : null,
-      error: all[4].ok ? (all[5].ok ? null : all[5].error) : all[4].error
-    };
-    state.renew = {
-      config: all[7].ok ? all[7].data : null,
-      history: all[8].ok ? all[8].data : null,
-      error: all[7].ok ? (all[8].ok ? null : all[8].error) : all[7].error
-    };
+    if (!all[0].ok) {
+      state.authed = false;
+      state.loading = false;
+      return render();
+    }
+    state.authed = true;
+    state.user = all[0].data;
+    state.subscribe = all[1].ok ? all[1].data : null;
+    state.comm = all[2].ok ? all[2].data : null;
+    state.checkin = { status: all[3].ok ? all[3].data : null, history: all[4].ok ? all[4].data : null, error: all[3].ok ? null : all[3].error };
+    state.topup = { methods: all[5].ok ? all[5].data : null, history: all[6].ok ? all[6].data : null, detail: all[7].ok ? all[7].data : null, error: all[5].ok ? null : all[5].error };
+    state.renew = { config: all[8].ok ? all[8].data : null, history: all[9].ok ? all[9].data : null, error: all[8].ok ? null : all[8].error };
     if (state.topup.detail && state.topup.detail.order && /paid|expired|cancelled|refunded/i.test(state.topup.detail.order.status_label || "")) {
-      sessionStorage.removeItem(LAST_TOPUP);
+      try { sessionStorage.removeItem(LAST_TOPUP); } catch (error) {}
     }
     state.loading = false;
     render();
     scheduleTopupPoll();
   }
 
-  var topupPollTimer = 0;
   function scheduleTopupPoll() {
     if (topupPollTimer) {
       clearTimeout(topupPollTimer);
@@ -1147,38 +778,39 @@
     topupPollTimer = setTimeout(function () { load(true); }, 3000);
   }
 
+  function scheduleMount() {
+    if (mountTimer) return;
+    mountTimer = setTimeout(function () {
+      mountTimer = 0;
+      if (!state.route.isWallet) return;
+      var existed = !!(dom.panel && dom.panel.parentElement && dom.panel.innerHTML);
+      mountPanel();
+      if (!existed) render();
+    }, 250);
+  }
+
   function sync() {
     state.locale = detectLocale();
     canonicalizeWalletHash();
-    var next = parseHash(location.hash);
-    if (next.isWallet && !state.route.isWallet) remember();
-    state.route = next;
+    state.route = parseHash(location.hash);
     load(false);
   }
 
   function init() {
     canonicalizeWalletHash();
     state.route = parseHash(location.hash);
-    ensureDockHost();
     load(false);
     if (document.body) {
-      var observer = new MutationObserver(function (records) {
-        if (shouldRefreshDock(records)) {
-          scheduleDockSync();
-        }
+      var observer = new MutationObserver(function () {
+        if (state.route.isWallet) scheduleMount();
       });
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["class", "style", "hidden", "aria-hidden"]
-      });
+      observer.observe(document.body, { childList: true, subtree: true });
     }
-    addEventListener("resize", scheduleDockSync, { passive: true });
-    document.addEventListener("click", onDocumentClick, true);
     addEventListener("hashchange", sync);
     addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && state.route.isWallet) closeWallet();
+      if (event.key === "Escape" && state.route.section) {
+        location.hash = "#" + OFFICIAL_PATH;
+      }
     });
   }
 

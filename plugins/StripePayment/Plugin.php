@@ -161,35 +161,137 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         ];
     }
 
-    public function notify($params)
+    public function inspectNotification($params = []): array
     {
         $params = is_array($params) ? $params : [];
 
         try {
             $payload = $this->getWebhookPayload($params);
             $signature = $this->getRequestHeader('Stripe-Signature', $params);
-
             if ($payload === '' || $signature === null || $signature === '') {
-                return false;
+                return ['ok' => false, 'outcome' => 'invalid'];
             }
 
             $event = $this->verifyWebhookPayload($payload, $signature);
-            $verify = $this->resolveWebhookResult($event);
-            if (!$verify) {
-                return false;
+            $type = (string) ($event['type'] ?? '');
+            $object = $event['data']['object'] ?? [];
+            $tradeNo = is_array($object) ? $this->extractTradeNo($object) : null;
+            $callbackNo = (string) ($event['id'] ?? ($object['payment_intent'] ?? $object['id'] ?? ''));
+
+            $outcome = match ($type) {
+                'checkout.session.completed',
+                'checkout.session.async_payment_succeeded' => (($object['payment_status'] ?? '') === 'paid') ? 'paid' : 'ignored',
+                'checkout.session.expired' => 'expired',
+                'checkout.session.async_payment_failed',
+                'payment_intent.payment_failed',
+                'payment_intent.canceled' => 'cancelled',
+                'charge.refunded',
+                'charge.refund.updated',
+                'refund.created' => 'refunded',
+                default => 'ignored',
+            };
+
+            return [
+                'ok' => true,
+                'outcome' => $outcome,
+                'trade_no' => $tradeNo,
+                'callback_no' => $callbackNo !== '' ? $callbackNo : null,
+                'amount' => isset($object['amount_total']) ? (int) $object['amount_total'] : (isset($object['amount']) ? (int) $object['amount'] : null),
+                'currency' => isset($object['currency']) ? strtoupper((string) $object['currency']) : null,
+                'event_type' => $type,
+                'meta' => [
+                    'gateway' => 'Stripe',
+                    'event_id' => $event['id'] ?? null,
+                    'event_type' => $type,
+                ],
+            ];
+        } catch (ApiException $exception) {
+            return [
+                'ok' => false,
+                'outcome' => 'invalid',
+                'error' => $exception->getMessage(),
+                'http_status' => 400,
+            ];
+        } catch (\Throwable $exception) {
+            Log::error($exception);
+
+            return [
+                'ok' => false,
+                'outcome' => 'invalid',
+                'error' => 'fail',
+                'http_status' => 500,
+            ];
+        }
+    }
+
+    public function notify($params)
+    {
+        $inspection = $this->inspectNotification($params);
+        if (!$inspection['ok']) {
+            if (!empty($inspection['error'])) {
+                Log::warning('Stripe notify rejected', [
+                    'uuid' => $this->getConfig('uuid'),
+                    'message' => $inspection['error'],
+                ]);
+
+                return response($inspection['error'], (int) ($inspection['http_status'] ?? 400));
             }
 
-            return $verify;
-        } catch (ApiException $e) {
-            Log::warning('Stripe notify rejected', [
-                'uuid' => $this->getConfig('uuid'),
-                'message' => $e->getMessage(),
-            ]);
-            return response($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            Log::error($e);
-            return response('fail', 500);
+            return false;
         }
+
+        if (($inspection['outcome'] ?? '') !== 'paid') {
+            return 'success';
+        }
+
+        $tradeNo = trim((string) ($inspection['trade_no'] ?? ''));
+        $callbackNo = trim((string) ($inspection['callback_no'] ?? ''));
+        if ($tradeNo === '' || $callbackNo === '') {
+            return false;
+        }
+
+        $order = Order::where('trade_no', $tradeNo)->first();
+        if (!$order) {
+            Log::warning('Stripe webhook ignored because order does not exist', [
+                'trade_no' => $tradeNo,
+                'event_id' => $inspection['meta']['event_id'] ?? null,
+            ]);
+
+            return 'success';
+        }
+
+        if ($order->status !== Order::STATUS_PENDING) {
+            return 'success';
+        }
+
+        $expectedAmount = (int) $order->total_amount + (int) ($order->handling_amount ?? 0);
+        $sessionAmount = (int) ($inspection['amount'] ?? -1);
+        if ($sessionAmount !== $this->toStripeUnitAmount($expectedAmount)) {
+            Log::warning('Stripe webhook amount mismatch', [
+                'trade_no' => $tradeNo,
+                'expected_amount' => $expectedAmount,
+                'session_amount' => $sessionAmount,
+            ]);
+
+            return false;
+        }
+
+        $sessionCurrency = strtoupper((string) ($inspection['currency'] ?? ''));
+        if ($sessionCurrency !== $this->getCurrency()) {
+            Log::warning('Stripe webhook currency mismatch', [
+                'trade_no' => $tradeNo,
+                'expected_currency' => $this->getCurrency(),
+                'session_currency' => $sessionCurrency,
+            ]);
+
+            return false;
+        }
+
+        return [
+            'trade_no' => $tradeNo,
+            'callback_no' => $callbackNo,
+            'custom_result' => 'success',
+        ];
     }
 
     private function createCheckoutSession(array $context): array
@@ -215,94 +317,30 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         return $this->postForm('/checkout/sessions', $payload);
     }
 
-    private function resolveWebhookResult(array $event): array|string|bool
-    {
-        $type = (string) ($event['type'] ?? '');
-
-        return match ($type) {
-            'checkout.session.completed',
-            'checkout.session.async_payment_succeeded' => $this->resolveCompletedSession($event),
-            'checkout.session.expired',
-            'checkout.session.async_payment_failed',
-            'payment_intent.payment_failed',
-            'payment_intent.canceled',
-            'charge.refunded',
-            'charge.refund.updated',
-            'refund.created' => 'success',
-            default => 'success',
-        };
-    }
-
-    private function resolveCompletedSession(array $event): array|string|bool
-    {
-        $session = $event['data']['object'] ?? null;
-        if (!is_array($session) || ($session['object'] ?? '') !== 'checkout.session') {
-            return false;
-        }
-
-        if (($session['payment_status'] ?? '') !== 'paid') {
-            return 'success';
-        }
-
-        $tradeNo = $this->extractTradeNo($session);
-        if ($tradeNo === null) {
-            return false;
-        }
-
-        $order = Order::where('trade_no', $tradeNo)->first();
-        if (!$order) {
-            Log::warning('Stripe webhook ignored because order does not exist', [
-                'trade_no' => $tradeNo,
-                'event_id' => $event['id'] ?? null,
-            ]);
-            return 'success';
-        }
-
-        if ($order->status !== Order::STATUS_PENDING) {
-            return 'success';
-        }
-
-        $expectedAmount = (int) $order->total_amount + (int) ($order->handling_amount ?? 0);
-        $sessionAmount = (int) ($session['amount_total'] ?? -1);
-        if ($sessionAmount !== $this->toStripeUnitAmount($expectedAmount)) {
-            Log::warning('Stripe webhook amount mismatch', [
-                'trade_no' => $tradeNo,
-                'expected_amount' => $expectedAmount,
-                'session_amount' => $sessionAmount,
-            ]);
-            return false;
-        }
-
-        $sessionCurrency = strtoupper((string) ($session['currency'] ?? ''));
-        if ($sessionCurrency !== $this->getCurrency()) {
-            Log::warning('Stripe webhook currency mismatch', [
-                'trade_no' => $tradeNo,
-                'expected_currency' => $this->getCurrency(),
-                'session_currency' => $sessionCurrency,
-            ]);
-            return false;
-        }
-
-        $callbackNo = (string) ($event['id'] ?? $session['payment_intent'] ?? $session['id'] ?? '');
-        if ($callbackNo === '') {
-            return false;
-        }
-
-        return [
-            'trade_no' => $tradeNo,
-            'callback_no' => $callbackNo,
-            'custom_result' => 'success',
-        ];
-    }
-
     private function extractTradeNo(array $session): ?string
     {
-        $tradeNo = $session['metadata']['trade_no'] ?? $session['client_reference_id'] ?? null;
-        if (!is_string($tradeNo) || $tradeNo === '') {
-            return null;
+        $candidates = [
+            $session['metadata']['trade_no'] ?? null,
+            $session['client_reference_id'] ?? null,
+        ];
+
+        $paymentIntent = $session['payment_intent'] ?? null;
+        if (is_array($paymentIntent)) {
+            $candidates[] = $paymentIntent['metadata']['trade_no'] ?? null;
         }
 
-        return $tradeNo;
+        $charge = $session['charge'] ?? null;
+        if (is_array($charge)) {
+            $candidates[] = $charge['metadata']['trade_no'] ?? null;
+        }
+
+        foreach ($candidates as $tradeNo) {
+            if (is_string($tradeNo) && $tradeNo !== '') {
+                return $tradeNo;
+            }
+        }
+
+        return null;
     }
 
     private function verifyWebhookPayload(string $payload, string $signatureHeader): array

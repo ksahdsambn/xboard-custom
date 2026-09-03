@@ -206,58 +206,92 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         ];
     }
 
-    public function notify($params)
+    public function inspectNotification($params = []): array
     {
         $params = is_array($params) ? $params : [];
 
         try {
             $payload = $this->extractWebhookPayload($params);
             if ($payload === []) {
-                return false;
+                return ['ok' => false, 'outcome' => 'invalid'];
             }
 
             if (!$this->verifySignature($payload)) {
-                throw new ApiException('Invalid BEpusdt signature');
+                return [
+                    'ok' => false,
+                    'outcome' => 'invalid',
+                    'error' => 'Invalid BEpusdt signature',
+                    'http_status' => 400,
+                ];
             }
 
-            $verify = $this->resolveWebhookResult($payload);
-            if (!$verify) {
-                return false;
-            }
+            $status = (int) ($payload['status'] ?? 0);
+            $outcome = match ($status) {
+                1 => 'pending',
+                2 => 'paid',
+                3 => 'expired',
+                default => 'ignored',
+            };
 
-            return $verify;
-        } catch (ApiException $e) {
-            Log::warning('BEpusdt notify rejected', [
-                'uuid' => $this->getConfig('uuid'),
-                'message' => $e->getMessage(),
-            ]);
-            return response($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            Log::error($e);
-            return response('fail', 500);
+            $tradeNo = trim((string) ($payload['order_id'] ?? ''));
+            $callbackNo = trim((string) ($payload['block_transaction_id'] ?? $payload['trade_id'] ?? ''));
+
+            return [
+                'ok' => true,
+                'outcome' => $outcome,
+                'trade_no' => $tradeNo !== '' ? $tradeNo : null,
+                'callback_no' => $callbackNo !== '' ? $callbackNo : null,
+                'amount' => $this->toAmountInCents($payload['amount'] ?? null),
+                'currency' => strtoupper((string) ($payload['fiat'] ?? $this->getFiat())),
+                'event_type' => (string) $status,
+                'meta' => [
+                    'gateway' => 'BEpusdt',
+                    'status' => $status,
+                    'trade_id' => $payload['trade_id'] ?? null,
+                ],
+            ];
+        } catch (ApiException $exception) {
+            return [
+                'ok' => false,
+                'outcome' => 'invalid',
+                'error' => $exception->getMessage(),
+                'http_status' => 400,
+            ];
+        } catch (\Throwable $exception) {
+            Log::error($exception);
+
+            return [
+                'ok' => false,
+                'outcome' => 'invalid',
+                'error' => 'fail',
+                'http_status' => 500,
+            ];
         }
     }
 
-    private function resolveWebhookResult(array $payload): array|string|bool
+    public function notify($params)
     {
-        $status = (int) ($payload['status'] ?? 0);
+        $inspection = $this->inspectNotification($params);
+        if (!$inspection['ok']) {
+            if (!empty($inspection['error'])) {
+                Log::warning('BEpusdt notify rejected', [
+                    'uuid' => $this->getConfig('uuid'),
+                    'message' => $inspection['error'],
+                ]);
 
-        return match ($status) {
-            1, 3 => 'success',
-            2 => $this->resolveSuccessfulPayment($payload),
-            default => $this->handleUnexpectedStatus($payload),
-        };
-    }
+                return response($inspection['error'], (int) ($inspection['http_status'] ?? 400));
+            }
 
-    private function resolveSuccessfulPayment(array $payload): array|string|bool
-    {
-        $tradeNo = trim((string) ($payload['order_id'] ?? ''));
-        if ($tradeNo === '') {
             return false;
         }
 
-        $callbackNo = trim((string) ($payload['block_transaction_id'] ?? $payload['trade_id'] ?? ''));
-        if ($callbackNo === '') {
+        if (($inspection['outcome'] ?? '') !== 'paid') {
+            return 'success';
+        }
+
+        $tradeNo = trim((string) ($inspection['trade_no'] ?? ''));
+        $callbackNo = trim((string) ($inspection['callback_no'] ?? ''));
+        if ($tradeNo === '' || $callbackNo === '') {
             return false;
         }
 
@@ -265,8 +299,9 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         if (!$order) {
             Log::warning('BEpusdt webhook ignored because order does not exist', [
                 'trade_no' => $tradeNo,
-                'trade_id' => $payload['trade_id'] ?? null,
+                'trade_id' => $inspection['meta']['trade_id'] ?? null,
             ]);
+
             return 'success';
         }
 
@@ -275,13 +310,14 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         }
 
         $expectedAmount = (int) $order->total_amount + (int) ($order->handling_amount ?? 0);
-        $callbackAmount = $this->toAmountInCents($payload['amount'] ?? null);
-        if ($callbackAmount === null || $callbackAmount !== $expectedAmount) {
+        $callbackAmount = $inspection['amount'] ?? null;
+        if ($callbackAmount === null || (int) $callbackAmount !== $expectedAmount) {
             Log::warning('BEpusdt webhook amount mismatch', [
                 'trade_no' => $tradeNo,
                 'expected_amount' => $expectedAmount,
                 'callback_amount' => $callbackAmount,
             ]);
+
             return false;
         }
 
@@ -290,17 +326,6 @@ class Plugin extends AbstractPlugin implements PaymentInterface
             'callback_no' => $callbackNo,
             'custom_result' => 'success',
         ];
-    }
-
-    private function handleUnexpectedStatus(array $payload): string
-    {
-        Log::warning('BEpusdt webhook ignored because status is unexpected', [
-            'trade_id' => $payload['trade_id'] ?? null,
-            'order_id' => $payload['order_id'] ?? null,
-            'status' => $payload['status'] ?? null,
-        ]);
-
-        return 'success';
     }
 
     private function extractWebhookPayload(array $params): array

@@ -2,13 +2,13 @@
 
 namespace Plugin\WalletCenter\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\PluginController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Plugin\WalletCenter\Services\WalletCenterConfigService;
 use Plugin\WalletCenter\Services\WalletCenterManifestService;
 
-abstract class BaseController extends Controller
+abstract class BaseController extends PluginController
 {
     public function __construct(
         protected WalletCenterConfigService $configService,
@@ -18,11 +18,22 @@ abstract class BaseController extends Controller
 
     protected function requireFeature(string $feature): ?JsonResponse
     {
+        if ($error = $this->beforePluginAction()) {
+            return $this->fail($error);
+        }
+
         if ($this->configService->isFeatureEnabled($feature)) {
             return null;
         }
 
         return $this->fail([403, sprintf('%s功能当前未启用。', $this->manifestService->getFeatureLabel($feature))]);
+    }
+
+    protected function resolvePage(Request $request): int
+    {
+        $page = (int) $request->query('page', 1);
+
+        return $page > 0 ? $page : 1;
     }
 
     protected function featurePayload(string $feature, array $extra = [], string $phase = 'wallet-center'): array

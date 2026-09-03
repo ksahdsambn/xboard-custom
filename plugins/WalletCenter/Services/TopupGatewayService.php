@@ -12,8 +12,6 @@ use Plugin\WalletCenter\Models\TopupOrder;
 
 class TopupGatewayService
 {
-    private const STRIPE_DEFAULT_TOLERANCE_SECONDS = 300;
-
     public function __construct(
         protected PluginManager $pluginManager
     ) {
@@ -58,11 +56,19 @@ class TopupGatewayService
 
     public function handleNotify(Payment $payment, Request $request): array
     {
-        return match ((string) $payment->payment) {
-            'Stripe' => $this->handleStripeNotify($payment, $request),
-            'BEpusdt' => $this->handleBepusdtNotify($payment, $request),
-            default => $this->handleGenericNotify($payment, $request),
-        };
+        $plugin = $this->resolvePaymentPlugin($payment);
+        if (method_exists($plugin, 'inspectNotification')) {
+            $params = $request->all();
+            if (!is_array($params)) {
+                $params = [];
+            }
+            $params['__request_content'] = $request->getContent();
+            $params['__request_headers'] = $request->headers->all();
+
+            return $this->mapInspectedNotification($payment, $plugin->inspectNotification($params));
+        }
+
+        return $this->handleGenericNotify($payment, $request);
     }
 
     public function buildNotifyUrl(Payment $payment): string
@@ -90,7 +96,7 @@ class TopupGatewayService
 
         $refererOrigin = $this->extractOrigin($referer);
         if ($refererOrigin !== null && $this->isTrustedReturnOrigin($refererOrigin)) {
-            return $referer;
+            return $refererOrigin . $this->appUrlPath() . '/#/profile?section=topup&topup_trade_no=' . rawurlencode((string) $order->trade_no);
         }
 
         return $fallbackUrl;
@@ -123,9 +129,105 @@ class TopupGatewayService
         throw new ApiException('WalletCenter topup payment plugin is not enabled');
     }
 
+    protected function mapInspectedNotification(Payment $payment, array $inspection): array
+    {
+        if (!($inspection['ok'] ?? false)) {
+            $status = (int) ($inspection['http_status'] ?? 422);
+
+            return [
+                'response' => response((string) ($inspection['error'] ?? 'verify error'), $status > 0 ? $status : 422),
+                'status' => null,
+                'trade_no' => $inspection['trade_no'] ?? null,
+                'callback_no' => $inspection['callback_no'] ?? null,
+                'meta' => $inspection['meta'] ?? ['error' => $inspection['error'] ?? 'verify error'],
+            ];
+        }
+
+        $outcome = (string) ($inspection['outcome'] ?? 'ignored');
+        $status = match ($outcome) {
+            'paid' => TopupOrder::STATUS_PAID,
+            'pending' => TopupOrder::STATUS_PENDING,
+            'expired' => TopupOrder::STATUS_EXPIRED,
+            'cancelled' => TopupOrder::STATUS_CANCELLED,
+            'refunded' => TopupOrder::STATUS_REFUNDED,
+            default => null,
+        };
+
+        $tradeNo = $inspection['trade_no'] ?? null;
+        $callbackNo = trim((string) ($inspection['callback_no'] ?? ''));
+        if ($status === TopupOrder::STATUS_PAID) {
+            if (!is_string($tradeNo) || $tradeNo === '' || $callbackNo === '') {
+                return [
+                    'response' => response('verify error', 422),
+                    'status' => null,
+                    'trade_no' => is_string($tradeNo) ? $tradeNo : null,
+                    'callback_no' => $callbackNo !== '' ? $callbackNo : null,
+                    'meta' => [
+                        'gateway' => $payment->payment,
+                        'error' => 'paid notification is missing trade_no or callback_no',
+                    ],
+                ];
+            }
+
+            $order = TopupOrder::query()->where('trade_no', $tradeNo)->first();
+            if ($order) {
+                $config = $this->normalizePaymentConfig($payment);
+                $expectedAmount = (int) $order->amount + (int) $order->handling_amount;
+                $actualAmount = $inspection['amount'] ?? null;
+                if ($payment->payment === 'Stripe') {
+                    $currency = strtoupper(trim((string) ($config['currency'] ?? admin_setting('currency', 'USD'))));
+                    $expectedAmount = $this->toStripeUnitAmount($expectedAmount, $currency);
+                    $actualCurrency = strtoupper(trim((string) ($inspection['currency'] ?? '')));
+                    if ($actualCurrency !== '' && $actualCurrency !== $currency) {
+                        return [
+                            'response' => response('currency mismatch', 400),
+                            'status' => null,
+                            'trade_no' => $tradeNo,
+                            'callback_no' => $callbackNo,
+                            'meta' => [
+                                'gateway' => $payment->payment,
+                                'expected_currency' => $currency,
+                                'actual_currency' => $actualCurrency,
+                            ],
+                        ];
+                    }
+                }
+                if ($actualAmount === null || (int) $actualAmount !== $expectedAmount) {
+                    return [
+                        'response' => response('amount mismatch', 400),
+                        'status' => null,
+                        'trade_no' => $tradeNo,
+                        'callback_no' => $callbackNo,
+                        'meta' => [
+                            'gateway' => $payment->payment,
+                            'expected_amount' => $expectedAmount,
+                            'actual_amount' => $actualAmount,
+                        ],
+                    ];
+                }
+            }
+        }
+
+        return [
+            'response' => 'success',
+            'status' => $status,
+            'trade_no' => $tradeNo,
+            'callback_no' => $callbackNo !== '' ? $callbackNo : ($inspection['callback_no'] ?? null),
+            'meta' => is_array($inspection['meta'] ?? null) ? $inspection['meta'] : ['gateway' => $payment->payment],
+        ];
+    }
+
     protected function normalizePaymentConfig(Payment $payment): array
     {
-        $config = is_array($payment->config) ? $payment->config : [];
+        $config = $payment->config;
+        if (is_string($config)) {
+            $decoded = json_decode($config, true);
+            $config = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($config)) {
+            $config = [];
+        }
+
         $config['enable'] = (bool) $payment->enable;
         $config['id'] = $payment->id;
         $config['uuid'] = $payment->uuid;
@@ -134,212 +236,6 @@ class TopupGatewayService
         return $config;
     }
 
-    protected function handleStripeNotify(Payment $payment, Request $request): array
-    {
-        $payload = $request->getContent();
-        $signature = trim((string) $request->header('Stripe-Signature'));
-        if ($payload === '' || $signature === '') {
-            return $this->failureResponse('verify error');
-        }
-
-        try {
-            $event = $this->verifyStripeWebhook(
-                $payload,
-                $signature,
-                trim((string) ($payment->config['webhook_secret'] ?? '')),
-                $this->resolveStripeTolerance($payment)
-            );
-        } catch (ApiException $exception) {
-            return [
-                'response' => response($exception->getMessage(), 400),
-                'status' => null,
-                'trade_no' => null,
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'Stripe',
-                    'error' => $exception->getMessage(),
-                ],
-            ];
-        }
-
-        $type = (string) ($event['type'] ?? '');
-
-        return match ($type) {
-            'checkout.session.completed',
-            'checkout.session.async_payment_succeeded' => $this->resolveStripeCompleted($payment, $event),
-            'checkout.session.expired' => $this->resolveStripeState($event, TopupOrder::STATUS_EXPIRED),
-            'checkout.session.async_payment_failed',
-            'payment_intent.payment_failed',
-            'payment_intent.canceled' => $this->resolveStripeState($event, TopupOrder::STATUS_CANCELLED),
-            'charge.refunded',
-            'refund.created' => $this->resolveStripeRefund($event),
-            default => [
-                'response' => 'success',
-                'status' => null,
-                'trade_no' => null,
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'Stripe',
-                    'event_id' => $event['id'] ?? null,
-                    'event_type' => $type,
-                    'ignored' => true,
-                ],
-            ],
-        };
-    }
-
-    protected function resolveStripeCompleted(Payment $payment, array $event): array
-    {
-        $session = $event['data']['object'] ?? null;
-        if (!is_array($session) || ($session['object'] ?? '') !== 'checkout.session') {
-            return $this->failureResponse('verify error');
-        }
-
-        if (($session['payment_status'] ?? '') !== 'paid') {
-            return [
-                'response' => 'success',
-                'status' => TopupOrder::STATUS_PENDING,
-                'trade_no' => $this->extractStripeTradeNo($session),
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'Stripe',
-                    'event_id' => $event['id'] ?? null,
-                    'event_type' => $event['type'] ?? null,
-                    'payment_status' => $session['payment_status'] ?? null,
-                ],
-            ];
-        }
-
-        $tradeNo = $this->extractStripeTradeNo($session);
-        if (!$tradeNo) {
-            return $this->failureResponse('verify error');
-        }
-
-        $order = TopupOrder::query()->where('trade_no', $tradeNo)->first();
-        if (!$order) {
-            return [
-                'response' => 'success',
-                'status' => null,
-                'trade_no' => $tradeNo,
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'Stripe',
-                    'event_id' => $event['id'] ?? null,
-                    'event_type' => $event['type'] ?? null,
-                    'ignored' => true,
-                ],
-            ];
-        }
-
-        $expectedAmount = (int) $order->amount + (int) $order->handling_amount;
-        $amountTotal = (int) ($session['amount_total'] ?? -1);
-        $expectedStripeAmount = $this->toStripeUnitAmount(
-            $expectedAmount,
-            strtoupper(trim((string) ($payment->config['currency'] ?? admin_setting('currency', 'USD'))))
-        );
-        if ($amountTotal !== $expectedStripeAmount) {
-            return [
-                'response' => response('amount mismatch', 400),
-                'status' => null,
-                'trade_no' => $tradeNo,
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'Stripe',
-                    'event_id' => $event['id'] ?? null,
-                    'event_type' => $event['type'] ?? null,
-                    'expected_amount' => $expectedStripeAmount,
-                    'actual_amount' => $amountTotal,
-                ],
-            ];
-        }
-
-        $expectedCurrency = strtoupper(trim((string) ($payment->config['currency'] ?? admin_setting('currency', 'USD'))));
-        $sessionCurrency = strtoupper((string) ($session['currency'] ?? ''));
-        if ($sessionCurrency !== $expectedCurrency) {
-            return [
-                'response' => response('currency mismatch', 400),
-                'status' => null,
-                'trade_no' => $tradeNo,
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'Stripe',
-                    'event_id' => $event['id'] ?? null,
-                    'event_type' => $event['type'] ?? null,
-                    'expected_currency' => $expectedCurrency,
-                    'actual_currency' => $sessionCurrency,
-                ],
-            ];
-        }
-
-        $callbackNo = (string) ($event['id'] ?? $session['payment_intent'] ?? $session['id'] ?? '');
-        if ($callbackNo === '') {
-            return $this->failureResponse('verify error');
-        }
-
-        return [
-            'response' => 'success',
-            'status' => TopupOrder::STATUS_PAID,
-            'trade_no' => $tradeNo,
-            'callback_no' => $callbackNo,
-            'meta' => [
-                'gateway' => 'Stripe',
-                'event_id' => $event['id'] ?? null,
-                'event_type' => $event['type'] ?? null,
-                'payment_intent' => $session['payment_intent'] ?? null,
-                'checkout_session_id' => $session['id'] ?? null,
-            ],
-        ];
-    }
-
-    protected function resolveStripeState(array $event, int $status): array
-    {
-        $object = $event['data']['object'] ?? null;
-        $tradeNo = is_array($object) ? $this->extractStripeTradeNo($object) : null;
-        $callbackNo = (string) ($event['id'] ?? $object['payment_intent'] ?? $object['id'] ?? '');
-
-        return [
-            'response' => 'success',
-            'status' => $status,
-            'trade_no' => $tradeNo,
-            'callback_no' => $callbackNo !== '' ? $callbackNo : null,
-            'meta' => [
-                'gateway' => 'Stripe',
-                'event_id' => $event['id'] ?? null,
-                'event_type' => $event['type'] ?? null,
-                'payment_status' => $object['payment_status'] ?? null,
-            ],
-        ];
-    }
-
-    protected function extractStripeTradeNo(array $payload): ?string
-    {
-        $tradeNo = $payload['metadata']['trade_no']
-            ?? $payload['client_reference_id']
-            ?? $payload['payment_intent']['metadata']['trade_no']
-            ?? null;
-
-        return is_string($tradeNo) && $tradeNo !== '' ? $tradeNo : null;
-    }
-
-    protected function resolveStripeRefund(array $event): array
-    {
-        $object = $event['data']['object'] ?? null;
-        $tradeNo = is_array($object) ? $this->extractStripeTradeNo($object) : null;
-        $callbackNo = (string) ($event['id'] ?? $object['id'] ?? '');
-
-        return [
-            'response' => 'success',
-            'status' => TopupOrder::STATUS_REFUNDED,
-            'trade_no' => $tradeNo,
-            'callback_no' => $callbackNo !== '' ? $callbackNo : null,
-            'meta' => [
-                'gateway' => 'Stripe',
-                'event_id' => $event['id'] ?? null,
-                'event_type' => $event['type'] ?? null,
-                'refunded' => true,
-            ],
-        ];
-    }
 
     protected function toStripeUnitAmount(int $amountInCents, string $currency): int
     {
@@ -434,276 +330,6 @@ class TopupGatewayService
         ];
     }
 
-    protected function verifyStripeWebhook(string $payload, string $signatureHeader, string $secret, int $tolerance): array
-    {
-        if ($secret === '') {
-            throw new ApiException('Stripe webhook secret is required');
-        }
-
-        $pairs = [];
-        foreach (explode(',', $signatureHeader) as $item) {
-            [$key, $value] = array_pad(explode('=', trim($item), 2), 2, null);
-            if ($key !== null && $value !== null) {
-                $pairs[$key][] = $value;
-            }
-        }
-
-        $timestamp = isset($pairs['t'][0]) ? (int) $pairs['t'][0] : 0;
-        $signatures = $pairs['v1'] ?? [];
-        if ($timestamp <= 0 || empty($signatures)) {
-            throw new ApiException('Invalid Stripe signature header');
-        }
-
-        if (abs(time() - $timestamp) > $tolerance) {
-            throw new ApiException('Stripe webhook timestamp expired');
-        }
-
-        $expectedSignature = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
-        foreach ($signatures as $signature) {
-            if (hash_equals($expectedSignature, (string) $signature)) {
-                $decoded = json_decode($payload, true);
-                if (is_array($decoded)) {
-                    return $decoded;
-                }
-
-                throw new ApiException('Invalid Stripe webhook payload');
-            }
-        }
-
-        throw new ApiException('Invalid Stripe webhook signature');
-    }
-
-    protected function resolveStripeTolerance(Payment $payment): int
-    {
-        $tolerance = (int) ($payment->config['webhook_tolerance_seconds'] ?? self::STRIPE_DEFAULT_TOLERANCE_SECONDS);
-
-        return max(60, $tolerance);
-    }
-
-    protected function handleBepusdtNotify(Payment $payment, Request $request): array
-    {
-        $payload = $this->extractBepusdtPayload($request);
-        if ($payload === []) {
-            return $this->failureResponse('verify error');
-        }
-
-        $apiToken = trim((string) ($payment->config['api_token'] ?? ''));
-        if ($apiToken === '') {
-            return [
-                'response' => response('BEpusdt api token is required', 400),
-                'status' => null,
-                'trade_no' => null,
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'BEpusdt',
-                    'error' => 'BEpusdt api token is required',
-                ],
-            ];
-        }
-
-        if (!$this->verifyBepusdtSignature($payload, $apiToken)) {
-            return [
-                'response' => response('Invalid BEpusdt signature', 400),
-                'status' => null,
-                'trade_no' => $payload['order_id'] ?? null,
-                'callback_no' => null,
-                'meta' => [
-                    'gateway' => 'BEpusdt',
-                    'error' => 'Invalid BEpusdt signature',
-                ],
-            ];
-        }
-
-        $status = (int) ($payload['status'] ?? 0);
-
-        return match ($status) {
-            1 => [
-                'response' => 'success',
-                'status' => TopupOrder::STATUS_PENDING,
-                'trade_no' => $this->extractBepusdtTradeNo($payload),
-                'callback_no' => $this->extractBepusdtCallbackNo($payload),
-                'meta' => [
-                    'gateway' => 'BEpusdt',
-                    'status' => $status,
-                    'trade_id' => $payload['trade_id'] ?? null,
-                ],
-            ],
-            2 => $this->resolveBepusdtPaid($payload),
-            3 => [
-                'response' => 'success',
-                'status' => TopupOrder::STATUS_EXPIRED,
-                'trade_no' => $this->extractBepusdtTradeNo($payload),
-                'callback_no' => $this->extractBepusdtCallbackNo($payload),
-                'meta' => [
-                    'gateway' => 'BEpusdt',
-                    'status' => $status,
-                    'trade_id' => $payload['trade_id'] ?? null,
-                ],
-            ],
-            default => [
-                'response' => 'success',
-                'status' => null,
-                'trade_no' => $this->extractBepusdtTradeNo($payload),
-                'callback_no' => $this->extractBepusdtCallbackNo($payload),
-                'meta' => [
-                    'gateway' => 'BEpusdt',
-                    'status' => $status,
-                    'ignored' => true,
-                ],
-            ],
-        };
-    }
-
-    protected function resolveBepusdtPaid(array $payload): array
-    {
-        $tradeNo = $this->extractBepusdtTradeNo($payload);
-        $callbackNo = $this->extractBepusdtCallbackNo($payload);
-        if ($tradeNo === null || $callbackNo === null) {
-            return $this->failureResponse('verify error');
-        }
-
-        $order = TopupOrder::query()->where('trade_no', $tradeNo)->first();
-        if (!$order) {
-            return [
-                'response' => 'success',
-                'status' => null,
-                'trade_no' => $tradeNo,
-                'callback_no' => $callbackNo,
-                'meta' => [
-                    'gateway' => 'BEpusdt',
-                    'status' => $payload['status'] ?? null,
-                    'ignored' => true,
-                ],
-            ];
-        }
-
-        $expectedAmount = (int) $order->amount + (int) $order->handling_amount;
-        $callbackAmount = $this->toAmountInCents($payload['amount'] ?? null);
-        if ($callbackAmount === null || $callbackAmount !== $expectedAmount) {
-            return [
-                'response' => response('amount mismatch', 400),
-                'status' => null,
-                'trade_no' => $tradeNo,
-                'callback_no' => $callbackNo,
-                'meta' => [
-                    'gateway' => 'BEpusdt',
-                    'status' => $payload['status'] ?? null,
-                    'expected_amount' => $expectedAmount,
-                    'actual_amount' => $callbackAmount,
-                ],
-            ];
-        }
-
-        return [
-            'response' => 'success',
-            'status' => TopupOrder::STATUS_PAID,
-            'trade_no' => $tradeNo,
-            'callback_no' => $callbackNo,
-            'meta' => [
-                'gateway' => 'BEpusdt',
-                'status' => $payload['status'] ?? null,
-                'trade_id' => $payload['trade_id'] ?? null,
-                'block_transaction_id' => $payload['block_transaction_id'] ?? null,
-            ],
-        ];
-    }
-
-    protected function extractBepusdtPayload(Request $request): array
-    {
-        $jsonPayload = $request->json()->all();
-        if (is_array($jsonPayload) && $jsonPayload !== []) {
-            return $this->stripInternalPayloadKeys($jsonPayload);
-        }
-
-        $rawPayload = $request->getContent();
-        if (is_string($rawPayload) && $rawPayload !== '') {
-            $decoded = json_decode($rawPayload, true);
-            if (is_array($decoded) && $decoded !== []) {
-                return $this->stripInternalPayloadKeys($decoded);
-            }
-        }
-
-        return $this->stripInternalPayloadKeys($request->all());
-    }
-
-    protected function stripInternalPayloadKeys(array $payload): array
-    {
-        unset($payload['__request_content'], $payload['__request_headers']);
-
-        return $payload;
-    }
-
-    protected function verifyBepusdtSignature(array $payload, string $apiToken): bool
-    {
-        $signature = strtolower(trim((string) ($payload['signature'] ?? '')));
-        if ($signature === '') {
-            return false;
-        }
-
-        return hash_equals($this->signBepusdtPayload($payload, $apiToken), $signature);
-    }
-
-    protected function signBepusdtPayload(array $payload, string $apiToken): string
-    {
-        unset($payload['signature']);
-
-        $pairs = [];
-        ksort($payload, SORT_STRING);
-        foreach ($payload as $key => $value) {
-            if ($value === null) {
-                continue;
-            }
-
-            if (is_string($value) && trim($value) === '') {
-                continue;
-            }
-
-            $pairs[] = $key . '=' . $this->stringifyBepusdtValue($value);
-        }
-
-        return md5(implode('&', $pairs) . $apiToken);
-    }
-
-    protected function stringifyBepusdtValue(mixed $value): string
-    {
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: (string) $value;
-        }
-
-        return (string) $value;
-    }
-
-    protected function extractBepusdtTradeNo(array $payload): ?string
-    {
-        $tradeNo = trim((string) ($payload['order_id'] ?? ''));
-
-        return $tradeNo !== '' ? $tradeNo : null;
-    }
-
-    protected function extractBepusdtCallbackNo(array $payload): ?string
-    {
-        $callbackNo = trim((string) ($payload['block_transaction_id'] ?? $payload['trade_id'] ?? ''));
-
-        return $callbackNo !== '' ? $callbackNo : null;
-    }
-
-    protected function toAmountInCents(mixed $value): ?int
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (!is_numeric($value)) {
-            return null;
-        }
-
-        return (int) round(((float) $value) * 100);
-    }
-
     protected function failureResponse(string $message): array
     {
         return [
@@ -717,17 +343,29 @@ class TopupGatewayService
 
     protected function buildDefaultReturnUrl(TopupOrder $order): string
     {
-        return $this->resolveSafeBaseUrl() . '/#/dashboard?xc_wallet=1&section=topup&topup_trade_no=' . rawurlencode((string) $order->trade_no);
+        return $this->resolveSafeBaseUrl() . '/#/profile?section=topup&topup_trade_no=' . rawurlencode((string) $order->trade_no);
     }
 
     protected function resolveSafeBaseUrl(): string
     {
-        $configuredOrigin = $this->extractOrigin((string) config('app.url'));
-        if ($configuredOrigin !== null) {
-            return $configuredOrigin;
+        $configured = trim((string) config('app.url'));
+        if ($this->extractOrigin($configured) !== null) {
+            return rtrim($configured, '/');
         }
 
-        return rtrim(request()->getSchemeAndHttpHost(), '/');
+        return rtrim(request()->getSchemeAndHttpHost(), '/') . $this->appUrlPath();
+    }
+
+    protected function appUrlPath(): string
+    {
+        $parts = parse_url((string) config('app.url'));
+        if (!is_array($parts) || !isset($parts['path'])) {
+            return '';
+        }
+
+        $path = rtrim((string) $parts['path'], '/');
+
+        return $path === '/' ? '' : $path;
     }
 
     protected function isTrustedReturnOrigin(string $origin): bool

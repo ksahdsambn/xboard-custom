@@ -599,3 +599,41 @@
 ### 是否放行
 
 - 是。官方管理后台 React 仍无插件页面槽位，记录查询继续走插件 admin API，并通过 `admin.user.detail` / `admin.user.transform` 挂到用户详情 JSON。
+
+## 2026-09-04 剩余贴合项（入口 / Naive / 分页 / RTL / i18n / PluginController / 验签）
+
+### 完成内容
+
+- 前台入口改为嵌入官方 `#/profile`「我的钱包」卡片下方，不再克隆侧栏 4 个菜单，也不再使用全屏浮层。遗留 `#/wallet` / `xc_wallet=1` 会规范化到 `#/profile`。
+- 钱包面板使用 Naive `n-card` / `n-button` / `n-radio` / `n-tag` / `n-pagination` / `n-empty` 结构，跟随官方主题卡片样式。
+- 充值通道展示官方支付实例 `icon`，并显示手续费。
+- 签到 / 充值 / 自动续费历史改为服务端分页，支持状态筛选和 CSV 导出。
+- RTL 改为逻辑属性（`inset-inline` / `text-align: start`），面板 `dir` 随 locale 切换。
+- 新增 `naiveLocaleAlias`（`ar-SA` → `fa-IR`，其余附加语言对齐 `en-US`）；校正法语/德语钱包文案。
+- WalletCenter 控制器改为继承官方 `PluginController`，并在功能校验前调用 `beforePluginAction()`。
+- Stripe / BEpusdt 抽出 `inspectNotification()`，WalletCenter 充值回调复用该验签结果，不再复制 webhook 验签实现。
+
+### 测试结果
+
+- `node --test tests/runtime-regression.test.js`：10 项全部通过。
+- `node --check theme/XboardCustom/assets/wallet-center.js`：通过。
+- `node --check theme/XboardCustom/assets/i18n-extra.js`：通过。
+
+### 是否放行
+
+- 是。官方编译前端仍未内置 13 种 Naive locale pack 源码；附加语言的日期组件继续通过别名使用已打包 locale，钱包面板日期使用 `Intl`。
+
+## 2026-09-04 三轮审查修复（未提交贴合项）
+
+### 完成内容
+
+- 充值回跳始终落到 `#/profile?section=topup&topup_trade_no=`，不再把原始 Referer 整段回传；`app.url` 子路径会保留。
+- 充值 `inspectNotification` 成功入账前强制校验单号、callback_no、金额；Stripe 同时校验币种。缺失金额不再放行。
+- Stripe 从 Checkout Session / PaymentIntent / Charge metadata 解析 `trade_no`；WalletCenter 官方回调拦截同步这些路径。
+- 钱包面板 MutationObserver 不再在每次 DOM 变化时 `innerHTML` 重绘；轮询保留金额/通道草稿；`#/404` 可按 `LAST_TOPUP` 拉回 profile。
+- 法语签到文案从错误的「Connexion quotidienne」改回「Pointage quotidien」。
+- `node --test tests/runtime-regression.test.js`：10 项全部通过。
+
+### 是否放行
+
+- 是。

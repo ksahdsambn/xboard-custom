@@ -225,6 +225,10 @@
 - 2026-09-04 | `plugins/WalletCenter/Commands/ExpirePendingTopupCommand.php` | `WalletCenter` | 清理超时未回调的待支付充值单。
 - 2026-09-04 | `plugins/WalletCenter/database/migrations/2026_09_04_000004_add_unique_index_to_wallet_center_checkin_logs.php` | `WalletCenter` | 签到 `(user_id, claim_date)` 唯一索引。
 - 2026-09-04 | `plugins/WalletCenter/Services/AutoRenewService.php` | `WalletCenter` | 自动续费改为 `OrderService::createFromRequest` + `paid()`，补到期挽回与失败通知。
+- 2026-09-04 | `plugins/StripePayment/Plugin.php` | `StripePayment` | 新增 `inspectNotification()`，订阅 `notify()` 与 WalletCenter 充值回调共用验签。
+- 2026-09-04 | `plugins/BepusdtPayment/Plugin.php` | `BEpusdtPayment` | 新增 `inspectNotification()`，与 Stripe 相同的验签复用契约。
+- 2026-09-04 | `theme/XboardCustom/assets/wallet-center.js` | `XboardCustom` | 钱包嵌入官方 `#/profile` 页面，使用 Naive 结构、分页筛选导出和支付图标。
+- 2026-09-04 | `plugins/WalletCenter/Services/TopupGatewayService.php` | `WalletCenter` | 充值回跳固定 profile 钱包页并保留 `app.url` 路径；`inspectNotification` 结果映射时校验金额/币种。
 
 ## 2026-03-10 新增文件专项复核补充
 

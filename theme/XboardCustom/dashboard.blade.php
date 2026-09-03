@@ -50,7 +50,7 @@
     window.xboardCustom = {
       theme: '{{$theme}}',
       version: '1.0.0',
-      walletHash: '#/dashboard?xc_wallet=1'
+      walletHash: '#/profile'
     };
   </script>
   <script src="/theme/{{$theme}}/assets/i18n-extra.js?v={{ $i18nExtraVersion }}"></script>

@@ -108,6 +108,8 @@ class Plugin extends AbstractPlugin
                 if (is_array($json) && $json !== []) {
                     $candidates[] = $json['data']['object']['metadata']['trade_no'] ?? null;
                     $candidates[] = $json['data']['object']['client_reference_id'] ?? null;
+                    $candidates[] = $json['data']['object']['payment_intent']['metadata']['trade_no'] ?? null;
+                    $candidates[] = $json['data']['object']['charge']['metadata']['trade_no'] ?? null;
                     $candidates[] = $json['order_id'] ?? null;
                     $candidates[] = $json['out_trade_no'] ?? null;
                 }
@@ -119,6 +121,8 @@ class Plugin extends AbstractPlugin
                     if (is_array($decoded)) {
                         $candidates[] = $decoded['data']['object']['metadata']['trade_no'] ?? null;
                         $candidates[] = $decoded['data']['object']['client_reference_id'] ?? null;
+                        $candidates[] = $decoded['data']['object']['payment_intent']['metadata']['trade_no'] ?? null;
+                        $candidates[] = $decoded['data']['object']['charge']['metadata']['trade_no'] ?? null;
                         $candidates[] = $decoded['order_id'] ?? null;
                         $candidates[] = $decoded['out_trade_no'] ?? null;
                     }
@@ -151,7 +155,7 @@ class Plugin extends AbstractPlugin
             'checkin_enabled' => (bool) ($states[WalletCenterFeature::CHECKIN] ?? false),
             'topup_enabled' => (bool) ($states[WalletCenterFeature::TOPUP] ?? false),
             'auto_renew_enabled' => (bool) ($states[WalletCenterFeature::AUTO_RENEW] ?? false),
-            'wallet_hash' => '#/dashboard?xc_wallet=1',
+            'wallet_hash' => '#/profile',
             'display_name' => (string) ($configService->getConfig()['display_name'] ?? 'WalletCenter'),
         ];
 

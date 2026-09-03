@@ -87,16 +87,14 @@ class CheckinController extends BaseController
             return $response;
         }
 
-        $records = $this->checkinService->getHistoryForUser(
-            $request->user(),
-            $this->resolveLimit($request)
-        );
+        $page = $this->resolvePage($request);
+        $perPage = $this->resolveLimit($request, 10, 50);
+        $history = $this->checkinService->paginateHistoryForUser($request->user(), $page, $perPage);
 
-        return $this->success($this->featurePayload(WalletCenterFeature::CHECKIN, [
-            'records' => $records,
-            'count' => $records->count(),
+        return $this->success($this->featurePayload(WalletCenterFeature::CHECKIN, array_merge($history, [
+            'count' => $history['total'],
             'reward_range' => $this->checkinService->getRewardRangeSnapshot(),
             'server_date' => now()->toDateString(),
-        ], 'wallet-center'));
+        ]), 'wallet-center'));
     }
 }

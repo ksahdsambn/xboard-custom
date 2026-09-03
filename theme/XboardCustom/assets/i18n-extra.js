@@ -3780,7 +3780,14 @@
                                  "topupCreated":  "充值订单已创建，即将跳转支付。",
                                  "checkinOk":  "签到成功，奖励已入账。",
                                  "renewOk":  "自动续费设置已更新。",
-                                 "failed":  "请求失败"
+                                 "failed":  "请求失败",
+                                 "page":  "页",
+                                 "prev":  "上一页",
+                                 "nextPage":  "下一页",
+                                 "filter":  "筛选",
+                                 "exportCsv":  "导出 CSV",
+                                 "all":  "全部",
+                                 "officialWallet":  "我的钱包"
                              },
                    "en-US":  {
                                  "wallet":  "Wallet",
@@ -3822,7 +3829,14 @@
                                  "topupCreated":  "Top-up order created. Redirecting to payment.",
                                  "checkinOk":  "Check-in succeeded.",
                                  "renewOk":  "Auto renew setting updated.",
-                                 "failed":  "Request failed"
+                                 "failed":  "Request failed",
+                                 "page":  "Page",
+                                 "prev":  "Previous",
+                                 "nextPage":  "Next",
+                                 "filter":  "Filter",
+                                 "exportCsv":  "Export CSV",
+                                 "all":  "All",
+                                 "officialWallet":  "My Wallet"
                              },
                    "zh-TW":  {
                                  "wallet":  "錢包",
@@ -4037,10 +4051,10 @@
                    "fr-FR":  {
                                  "wallet":  "Portefeuille",
                                  "checkin":  "Pointage quotidien",
-                                 "topup":  "Recharger le solde",
+                                 "topup":  "Recharge du solde",
                                  "renew":  "Renouvellement automatique",
-                                 "title":  "PortefeuilleCentre",
-                                 "subtitle":  "Consultez le solde, le pointage quotidien, la recharge du solde et le renouvellement automatique en un seul endroit.",
+                                 "title":  "Extensions du portefeuille",
+                                 "subtitle":  "Consultez le solde, la connexion quotidienne, la recharge et le renouvellement automatique au même endroit.",
                                  "refresh":  "Actualiser",
                                  "back":  "Retour",
                                  "loading":  "Chargement des données du portefeuille",
@@ -4049,7 +4063,7 @@
                                  "balance":  "Solde",
                                  "plan":  "Forfait actuel",
                                  "expire":  "Expiration",
-                                 "renewStatus":  "Renouveler le statut",
+                                 "renewStatus":  "Statut du renouvellement",
                                  "enabled":  "Activé",
                                  "disabled":  "Désactivé",
                                  "statusEnabled":  "Activé",
@@ -4067,7 +4081,7 @@
                                  "next":  "Analyse suivante",
                                  "result":  "Dernier résultat",
                                  "reason":  "Raison",
-                                 "history":  "Histoire",
+                                 "history":  "Historique",
                                  "disabledFeature":  "Cette fonctionnalité est actuellement désactivée.",
                                  "empty":  "Aucune donnée",
                                  "refreshHint":  "Si le paiement vient de se terminer, actualisez pour synchroniser le résultat.",
@@ -4077,21 +4091,21 @@
                                  "failed":  "La demande a échoué"
                              },
                    "de-DE":  {
-                                 "wallet":  "Geldbörse",
+                                 "wallet":  "Wallet",
                                  "checkin":  "Täglicher Check-in",
                                  "topup":  "Guthaben aufladen",
                                  "renew":  "Automatische Verlängerung",
-                                 "title":  "WalletCenter",
-                                 "subtitle":  "Überprüfen Sie den Kontostand, den täglichen Check-in, das Aufladen des Guthabens und den Status der automatischen Verlängerung an einem Ort.",
+                                 "title":  "Wallet-Erweiterungen",
+                                 "subtitle":  "Check-in, Aufladung und automatische Verlängerung an einem Ort.",
                                  "refresh":  "Aktualisieren",
                                  "back":  "Zurück",
                                  "loading":  "Wallet-Daten werden geladen",
                                  "login":  "Es wurde keine authentifizierte Sitzung erkannt. Bitte melden Sie sich zuerst an.",
                                  "toLogin":  "Gehen Sie zum Anmelden",
-                                 "balance":  "Gleichgewicht",
-                                 "plan":  "Aktueller Plan",
+                                 "balance":  "Guthaben",
+                                 "plan":  "Aktueller Tarif",
                                  "expire":  "Ablauf",
-                                 "renewStatus":  "Status erneuern",
+                                 "renewStatus":  "Verlängerungsstatus",
                                  "enabled":  "Aktiviert",
                                  "disabled":  "Deaktiviert",
                                  "statusEnabled":  "Aktiviert",
@@ -5409,6 +5423,21 @@
     scheduleAuthPageStateSync();
     scheduleAuthLocaleDropdownSync();
   }
+  payload.naiveLocaleAlias = {
+    "fr-FR": "en-US",
+    "de-DE": "en-US",
+    "es-ES": "en-US",
+    "it-IT": "en-US",
+    "pt-PT": "en-US",
+    "nl-NL": "en-US",
+    "pl-PL": "en-US",
+    "tr-TR": "en-US",
+    "ru-RU": "en-US",
+    "ar-SA": "fa-IR",
+    "nb-NO": "en-US",
+    "sv-SE": "en-US",
+    "fi-FI": "en-US"
+  };
   window.__xboardCustomGetStoredLocale = readStoredLocale;
   window.__xboardCustomApplyLocaleDirection = applyLocaleDirection;
   window.xboardCustomI18n = payload;
