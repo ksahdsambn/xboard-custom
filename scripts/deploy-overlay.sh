@@ -123,15 +123,17 @@ refresh_theme_if_possible() {
     return 0
   fi
 
-  if ! has_compose_service "${WEB_SERVICE}"; then
-    echo "Skip theme refresh because web service does not exist: ${WEB_SERVICE}"
+  if [[ -z "${WEB_SERVICE}" ]] || ! has_compose_service "${WEB_SERVICE}"; then
+    echo "Skip theme refresh because web service does not exist: ${WEB_SERVICE:-unset}"
     return 0
   fi
 
   echo "Refresh current theme public assets"
   (
     cd "${OFFICIAL_ROOT}"
-    "${COMPOSE_CMD[@]}" exec -T "${WEB_SERVICE}" php artisan tinker --execute="app(\App\Services\ThemeService::class)->refreshCurrentTheme();"
+    "${COMPOSE_CMD[@]}" exec -T "${WEB_SERVICE}" php artisan tinker --execute="app(\App\Services\ThemeService::class)->refreshCurrentTheme();" || true
+    echo "Copy ${THEME_NAME} from storage/theme into public/theme"
+    "${COMPOSE_CMD[@]}" exec -T "${WEB_SERVICE}" sh -c "rm -rf public/theme/${THEME_NAME} && mkdir -p public/theme && cp -a storage/theme/${THEME_NAME} public/theme/${THEME_NAME}"
   )
 }
 
