@@ -48,11 +48,11 @@ class AutoRenewService
                     : null,
                 'last_result' => $latestRecord
                     ? AutoRenewRecord::statusLabel((int) $latestRecord->status)
-                    : ($setting->last_result ?? null),
+                    : (optional($setting)->last_result ?? null),
                 'last_result_at' => $latestRecord
                     ? $this->formatDateTime($latestRecord->executed_at)
                     : $this->formatDateTime(optional($setting)->last_result_at),
-                'last_result_reason' => $latestRecord->reason ?? Arr::get($snapshot, 'latest_reason'),
+                'last_result_reason' => optional($latestRecord)->reason ?? Arr::get($snapshot, 'latest_reason'),
             ],
             'subscription' => $context['subscription'],
             'latest_record' => $latestRecord,

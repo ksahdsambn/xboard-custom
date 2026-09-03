@@ -208,7 +208,16 @@ class TopupService
                 ];
             }
         } elseif (is_string($tradeNo) && $tradeNo !== '' && $status === TopupOrder::STATUS_REFUNDED) {
-            $this->markRefunded($tradeNo, is_string($callbackNo) ? $callbackNo : null, $meta);
+            try {
+                $this->markRefunded($tradeNo, is_string($callbackNo) ? $callbackNo : null, $meta);
+            } catch (\Throwable $exception) {
+                Log::error($exception);
+
+                return [
+                    'response' => response('handle error', 400),
+                    'result' => $result,
+                ];
+            }
         } elseif (is_string($tradeNo) && $tradeNo !== '' && $status !== null) {
             $this->markStatus($tradeNo, (int) $status, $callbackNo, $meta);
         }
@@ -264,15 +273,12 @@ class TopupService
                     return true;
                 }
 
-                if (in_array((int) $order->status, [
-                    TopupOrder::STATUS_CANCELLED,
-                    TopupOrder::STATUS_EXPIRED,
-                    TopupOrder::STATUS_REFUNDED,
-                ], true)) {
+                if ((int) $order->status === TopupOrder::STATUS_REFUNDED) {
                     $this->updateExtra($order, [
                         'late_paid_callback' => [
                             'callback_no' => $callbackNo,
                             'received_at' => now()->toIso8601String(),
+                            'ignored_because' => 'already_refunded',
                             'meta' => $meta,
                         ],
                     ]);
@@ -395,11 +401,7 @@ class TopupService
                 if ($user) {
                     $clawback = (int) $order->amount;
                     if (!$this->userService->addBalance($user->id, -$clawback)) {
-                        $order->extra = $this->mergeExtra($order->extra, [
-                            'refund_clawback_failed' => true,
-                            'refund_clawback_amount' => $clawback,
-                        ]);
-                        $clawback = 0;
+                        throw new \RuntimeException('WalletCenter topup refund clawback failed.');
                     }
                 }
             }
