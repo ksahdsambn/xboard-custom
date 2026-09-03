@@ -49,7 +49,7 @@ test('Wallet hash canonicalizes legacy wallet query onto official profile', () =
   assert.equal(trailing.path, '/profile');
   assert.equal(trailing.isWallet, true);
   assert.match(source, /parsed\.path === "\/404" && \(parsed\.tradeNo \|\| lastTopup\)/);
-  assert.match(source, /var existed = !!\(dom\.panel && dom\.panel\.parentElement && dom\.panel\.innerHTML\)/);
+  assert.match(source, /xc-wallet-root/);
   assert.match(source, /restoreDraft/);
 });
 
@@ -107,17 +107,21 @@ test('i18n extra locales keep {total} placeholder and naive locale aliases', () 
   assert.match(source, /"ar-SA": "fa-IR"/);
 });
 
-test('Wallet UI uses Naive card/radio/pagination classes and payment icons', () => {
+test('Wallet UI uses self-contained card/button classes and payment icons', () => {
   const source = readSource('theme/XboardCustom/assets/wallet-center.js');
-  assert.match(source, /n-card n-card--bordered/);
-  assert.match(source, /n-radio-group/);
+  assert.match(source, /xc-wallet-panel/);
+  assert.match(source, /xc-wallet-btn/);
+  assert.match(source, /xc-wallet-tab/);
   assert.match(source, /paymentIcon/);
   assert.match(source, /exportCsv/);
-  assert.match(source, /n-pagination/);
+  assert.doesNotMatch(source, /n-button n-button--/);
+  assert.doesNotMatch(source, /n-card n-card--bordered/);
 });
 
 test('Wallet RTL uses logical inset properties', () => {
   const source = readSource('theme/XboardCustom/assets/wallet-center.css');
   assert.match(source, /inset-inline-end/);
   assert.match(source, /html\[dir="rtl"\]/);
+  assert.match(source, /#xc-wallet-root/);
+  assert.match(source, /pointer-events:\s*auto/);
 });

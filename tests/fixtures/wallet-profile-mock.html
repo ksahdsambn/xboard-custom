@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wallet profile mock</title>
+  <link rel="stylesheet" href="../../theme/XboardCustom/assets/wallet-center.css" />
+  <style>
+    body { margin: 0; background: #f3f5f7; font-family: "Segoe UI", sans-serif; }
+    #app { min-height: 100vh; }
+    .n-layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .n-layout-sider { background: #fff; padding: 18px; }
+    .n-layout-content { padding: 24px; }
+    .n-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 0; }
+    .n-card-header { display: flex; justify-content: space-between; padding: 18px 20px 8px; }
+    .n-card-header__main { font-size: 16px; font-weight: 600; }
+    .n-card__content { padding: 8px 20px 24px; }
+    .n-button--primary-type { background: #1e4b6b; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; }
+    .balance { font-size: 40px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="n-layout">
+      <aside class="n-layout-sider">个人中心</aside>
+      <main class="n-layout-content">
+        <section class="n-card" id="official-wallet">
+          <div class="n-card-header"><div class="n-card-header__main">我的钱包</div></div>
+          <div class="n-card__content">
+            <div class="balance">0.04 <small>EUR</small></div>
+            <p>账户余额(仅消费)</p>
+          </div>
+        </section>
+        <section class="n-card" id="password-card" style="margin-top:16px">
+          <div class="n-card-header"><div class="n-card-header__main">修改密码</div></div>
+          <div class="n-card__content"><input placeholder="新密码" /></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script>
+    location.hash = "#/profile";
+    localStorage.setItem("VUE_NAIVE_ACCESS_TOKEN", JSON.stringify({ value: "test.token.value" }));
+    window.settings = { theme: { color: "default" } };
+    window.fetch = async function (url) {
+      if (String(url).indexOf("/user/info") !== -1) return json({ id: 1, email: "a@b.c" });
+      if (String(url).indexOf("/getSubscribe") !== -1) return json({ plan_id: 1 });
+      if (String(url).indexOf("/comm/config") !== -1) return json({ currency_symbol: "€" });
+      if (String(url).indexOf("checkin/status") !== -1) return json({ notice: "每天可签到一次", reward_range: { min: 1, max: 5 }, streak_days: 1, today_claimed: false });
+      if (String(url).indexOf("checkin/history") !== -1) return json({ records: [{ claim_date: "2026-09-04", reward_amount: 4 }], total: 1, page: 1, last_page: 1 });
+      if (String(url).indexOf("topup/methods") !== -1) return json({ payment_channels: [{ id: 11, name: "Stripe", payment: "Stripe", icon: "Stripe", handling_fee_percent: 0 }], amount_range: { min: 100, max: 10000 } });
+      if (String(url).indexOf("topup/history") !== -1) return json({ records: [{ trade_no: "T1", amount: 400, status_label: "paid" }], total: 1, page: 1, last_page: 1 });
+      if (String(url).indexOf("auto-renew/config") !== -1) {
+        if (String(url).indexOf("POST") !== -1) {}
+        return json({ config: { enabled: false, last_result: null }, subscription: { amount: 900 } });
+      }
+      if (String(url).indexOf("auto-renew/history") !== -1) return json({ records: [], total: 0, page: 1, last_page: 1 });
+      if (String(url).indexOf("checkin/claim") !== -1) return json({ claimed: true });
+      if (String(url).indexOf("topup/create") !== -1) return json({ order: { trade_no: "T2" }, payment_result: { type: 0 } });
+      return json({});
+    };
+    async function json(data) {
+      return { ok: true, status: 200, text: async function () { return JSON.stringify({ status: "success", data: data }); } };
+    }
+    setInterval(function () {
+      var stray = document.querySelector("#app .xc-wallet-panel");
+      if (stray) stray.remove();
+    }, 400);
+  </script>
+  <script src="../../theme/XboardCustom/assets/wallet-center.js"></script>
+  <script>
+    window.__walletUiTest = async function () {
+      var out = [];
+      function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+      await wait(400);
+      var root = document.getElementById("xc-wallet-root");
+      var panel = document.querySelector(".xc-wallet-panel");
+      out.push("root=" + !!root);
+      out.push("panel=" + !!panel);
+      out.push("hidden=" + !!(root && root.hidden));
+      out.push("buttons=" + (panel ? panel.querySelectorAll("button").length : 0));
+      var claim = panel && panel.querySelector('[data-xc="claim"]');
+      var rect = claim && claim.getBoundingClientRect();
+      out.push("claimH=" + (rect ? Math.round(rect.height) : 0));
+      out.push("claimW=" + (rect ? Math.round(rect.width) : 0));
+      var topupTab = panel && panel.querySelector('[data-section="topup"]');
+      if (topupTab) topupTab.click();
+      await wait(200);
+      out.push("topupInput=" + !!document.querySelector("#xc-topup-amount"));
+      var create = document.querySelector('[data-xc="topup"]');
+      out.push("createBtn=" + !!create);
+      var renewTab = document.querySelector('[data-section="renew"]');
+      if (renewTab) renewTab.click();
+      await wait(200);
+      out.push("renewBtn=" + !!document.querySelector('[data-xc="renew"]'));
+      var checkinTab = document.querySelector('[data-section="checkin"]');
+      if (checkinTab) checkinTab.click();
+      await wait(200);
+      var originalConfirm = window.confirm;
+      window.confirm = function () { return true; };
+      var claim2 = document.querySelector('[data-xc="claim"]');
+      if (claim2) claim2.click();
+      await wait(300);
+      window.confirm = originalConfirm;
+      out.push("toast=" + !!document.querySelector(".xc-wallet-toast"));
+      out.push("insideApp=" + !!document.querySelector("#app .xc-wallet-panel"));
+      var password = document.getElementById("password-card").getBoundingClientRect();
+      var panelRect = document.querySelector(".xc-wallet-panel").getBoundingClientRect();
+      out.push("overlap=" + (panelRect.bottom > password.top + 8 && panelRect.top < password.bottom - 8));
+      document.title = out.join(" | ");
+      var pre = document.createElement("pre");
+      pre.id = "xc-test-out";
+      pre.textContent = out.join("\n");
+      document.body.appendChild(pre);
+      return out;
+    };
+    window.addEventListener("load", function () { window.__walletUiTest(); });
+  </script>
+</body>
+</html>

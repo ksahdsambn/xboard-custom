@@ -3745,7 +3745,7 @@
                                  "checkin":  "每日签到",
                                  "topup":  "充值余额",
                                  "renew":  "自动续费",
-                                 "title":  "WalletCenter",
+                                 "title":  "钱包扩展",
                                  "subtitle":  "集中查看余额、每日签到、充值余额和自动续费状态。",
                                  "refresh":  "刷新",
                                  "back":  "返回",

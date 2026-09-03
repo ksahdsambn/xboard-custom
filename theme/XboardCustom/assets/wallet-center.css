@@ -1,22 +1,162 @@
-.xc-wallet-panel {
-  margin-block-start: 1.25rem;
-  margin-inline: 0;
+#xc-wallet-root {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  box-sizing: border-box;
 }
 
-.xc-wallet-panel .n-card__content {
-  display: grid;
+#xc-wallet-root[hidden] {
+  display: none !important;
+}
+
+.xc-wallet-panel {
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--xc-text, #1f2225);
+  background: var(--xc-card-bg, #fff);
+  border: 1px solid var(--xc-card-border, rgba(239, 239, 245, 1));
+  border-radius: var(--xc-card-radius, 8px);
+  box-shadow: var(--xc-card-shadow, 0 1px 2px rgba(0, 0, 0, 0.04));
+  font-family: inherit;
+  text-align: start;
+}
+
+.xc-wallet-panel *,
+.xc-wallet-panel *::before,
+.xc-wallet-panel *::after {
+  box-sizing: border-box;
+}
+
+.xc-wallet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
+  padding: 18px 20px 12px;
+}
+
+.xc-wallet-head h2 {
+  margin: 0;
+  font-size: var(--xc-title-size, 16px);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--xc-title-color, #1f2225);
+}
+
+.xc-wallet-head p {
+  margin: 4px 0 0;
+  color: var(--xc-muted, #999);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .xc-wallet-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 0 20px 16px;
 }
 
-.xc-wallet-section {
+.xc-wallet-tab,
+.xc-wallet-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--xc-btn-radius, 6px);
+  background: var(--xc-accent, #2080f0);
+  color: var(--xc-accent-text, #fff);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.xc-wallet-tab:hover,
+.xc-wallet-btn:hover {
+  filter: brightness(0.96);
+}
+
+.xc-wallet-tab:focus-visible,
+.xc-wallet-btn:focus-visible,
+.xc-wallet-input:focus-visible,
+.xc-wallet-select:focus-visible,
+.xc-wallet-pay:focus-within {
+  outline: 2px solid var(--xc-accent, #2080f0);
+  outline-offset: 2px;
+}
+
+.xc-wallet-tab {
+  background: var(--xc-soft, #f3f3f5);
+  color: var(--xc-text, #1f2225);
+  border-color: transparent;
+}
+
+.xc-wallet-tab.is-active {
+  background: var(--xc-accent, #2080f0);
+  color: var(--xc-accent-text, #fff);
+}
+
+.xc-wallet-btn--ghost,
+.xc-wallet-btn--default {
+  background: #fff;
+  color: var(--xc-text, #1f2225);
+  border-color: var(--xc-line, #e0e0e6);
+}
+
+.xc-wallet-btn:disabled,
+.xc-wallet-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: none;
+}
+
+.xc-wallet-body {
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  padding: 0 20px 20px;
+}
+
+.xc-wallet-note,
+.xc-wallet-meta {
+  margin: 0;
+  color: var(--xc-muted, #666);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.xc-wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.xc-wallet-input {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--xc-line, #e0e0e6);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+
+.xc-wallet-pay-list {
+  display: grid;
+  gap: 8px;
 }
 
 .xc-wallet-pay {
@@ -24,14 +164,40 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--n-border-color, rgba(148, 163, 184, 0.35));
+  border: 1px solid var(--xc-line, #e0e0e6);
   border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.xc-wallet-pay:has(input:checked) {
+  border-color: var(--xc-accent, #2080f0);
+  box-shadow: inset 0 0 0 1px var(--xc-accent, #2080f0);
+}
+
+.xc-wallet-pay input {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--xc-accent, #2080f0);
+}
+
+.xc-wallet-pay strong,
+.xc-wallet-pay small {
+  display: block;
+}
+
+.xc-wallet-pay small {
+  margin-block-start: 2px;
+  color: var(--xc-muted, #666);
+  font-size: 12px;
 }
 
 .xc-wallet-pay-icon {
   width: 28px;
   height: 28px;
   object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .xc-wallet-pay-icon--text {
@@ -39,6 +205,80 @@
   align-items: center;
   justify-content: center;
   font-size: 18px;
+}
+
+.xc-wallet-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: var(--xc-soft, #f3f3f5);
+  color: var(--xc-text, #1f2225);
+  font-size: 12px;
+}
+
+.xc-wallet-tag--success {
+  background: rgba(24, 160, 88, 0.12);
+  color: #18a058;
+}
+
+.xc-wallet-tag--warning {
+  background: rgba(240, 160, 32, 0.14);
+  color: #c78b00;
+}
+
+.xc-wallet-h {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.xc-wallet-list {
+  display: grid;
+  gap: 8px;
+}
+
+.xc-wallet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--xc-line, #eef0f3);
+  border-radius: 8px;
+  background: var(--xc-soft, #fafafc);
+}
+
+.xc-wallet-row small {
+  display: block;
+  margin-block-start: 4px;
+  color: var(--xc-muted, #666);
+}
+
+.xc-wallet-empty {
+  padding: 18px 12px;
+  color: var(--xc-muted, #666);
+  text-align: center;
+  font-size: 13px;
+}
+
+.xc-wallet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.xc-wallet-select {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--xc-line, #e0e0e6);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
 }
 
 .xc-wallet-pager {
@@ -49,14 +289,8 @@
 }
 
 .xc-wallet-pager__info {
-  color: var(--n-text-color-3, #64748b);
+  color: var(--xc-muted, #666);
   font-size: 13px;
-}
-
-.xc-wallet-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .xc-wallet-toast-stack {
@@ -66,6 +300,7 @@
   z-index: 4000;
   display: grid;
   gap: 8px;
+  pointer-events: none;
 }
 
 .xc-wallet-toast {
@@ -74,14 +309,37 @@
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.92);
   color: #fff;
+  pointer-events: auto;
 }
 
-.xc-wallet-toast.n-message--success {
+.xc-wallet-toast.is-success {
   background: #18a058;
 }
 
-.xc-wallet-toast.n-message--error {
+.xc-wallet-toast.is-error {
   background: #d03050;
+}
+
+html.dark .xc-wallet-panel,
+.n-config-provider[class*="dark"] .xc-wallet-panel {
+  --xc-card-bg: #242428;
+  --xc-text: #eee;
+  --xc-title-color: #eee;
+  --xc-muted: #aaa;
+  --xc-soft: #2c2c32;
+  --xc-line: #3a3a42;
+  --xc-card-border: #3a3a42;
+}
+
+html.dark .xc-wallet-btn--ghost,
+html.dark .xc-wallet-btn--default,
+html.dark .xc-wallet-input,
+html.dark .xc-wallet-select,
+html.dark .xc-wallet-pay,
+html.dark .xc-wallet-row {
+  background: #2c2c32;
+  color: #eee;
+  border-color: #3a3a42;
 }
 
 html[dir="rtl"] .xc-wallet-panel,
@@ -89,18 +347,14 @@ html[dir="rtl"] .xc-wallet-panel,
   text-align: start;
 }
 
-html[dir="rtl"] .xc-wallet-pay,
-html[dir="rtl"] .xc-wallet-pager,
-html[dir="rtl"] .xc-wallet-tabs {
-  flex-direction: row;
-}
-
 @media (max-width: 720px) {
-  .xc-wallet-panel {
-    margin-block-start: 12px;
+  .xc-wallet-tabs .xc-wallet-tab {
+    flex: 1 1 auto;
   }
 
-  .xc-wallet-tabs .n-button {
-    flex: 1 1 auto;
+  .xc-wallet-head,
+  .xc-wallet-tabs,
+  .xc-wallet-body {
+    padding-inline: 14px;
   }
 }

@@ -11,6 +11,7 @@
   var state = {
     locale: detectLocale(),
     route: parseHash(location.hash),
+    section: "",
     token: null,
     authed: false,
     loading: false,
@@ -25,7 +26,7 @@
     filters: { topup: "all", renew: "all" }
   };
   var dom = {};
-  var mountTimer = 0;
+  var placeTimer = 0;
   var topupPollTimer = 0;
 
   function buildTextCatalog() {
@@ -41,25 +42,13 @@
         loading: "正在加载",
         login: "请先登录。",
         toLogin: "去登录",
-        balance: "账户余额",
-        plan: "当前套餐",
-        expire: "到期时间",
-        renewStatus: "续费状态",
-        statusEnabled: "已开启",
-        statusDisabled: "未开启",
-        enableAction: "开启",
-        disableAction: "关闭",
-        none: "无",
         claim: "立即签到",
         claimed: "今日已签到",
         range: "奖励区间",
-        latest: "最近记录",
         amount: "金额",
-        methods: "支付方式",
         create: "创建充值订单",
         next: "下次扫描",
         result: "最近结果",
-        reason: "原因",
         history: "历史记录",
         disabledFeature: "该功能当前未启用。",
         empty: "暂无数据",
@@ -75,7 +64,6 @@
         confirmTopup: "确认创建充值订单并跳转支付？",
         confirmRenewOn: "确认开启余额自动续费？续费将创建官方订单。",
         confirmRenewOff: "确认关闭自动续费？",
-        polling: "正在同步支付结果…",
         streak: "连续签到",
         notice: "说明",
         page: "页",
@@ -84,7 +72,12 @@
         filter: "筛选",
         exportCsv: "导出 CSV",
         all: "全部",
-        officialWallet: "我的钱包"
+        officialWallet: "我的钱包",
+        statusEnabled: "已开启",
+        statusDisabled: "未开启",
+        enableAction: "开启",
+        disableAction: "关闭",
+        none: "无"
       },
       "en-US": {
         wallet: "Wallet",
@@ -97,25 +90,13 @@
         loading: "Loading",
         login: "Please log in first.",
         toLogin: "Go to login",
-        balance: "Balance",
-        plan: "Current plan",
-        expire: "Expiry",
-        renewStatus: "Renew status",
-        statusEnabled: "Enabled",
-        statusDisabled: "Disabled",
-        enableAction: "Enable",
-        disableAction: "Disable",
-        none: "None",
         claim: "Claim today",
         claimed: "Claimed today",
         range: "Reward range",
-        latest: "Latest record",
         amount: "Amount",
-        methods: "Payment methods",
         create: "Create top-up order",
         next: "Next scan",
         result: "Last result",
-        reason: "Reason",
         history: "History",
         disabledFeature: "This feature is currently disabled.",
         empty: "No data",
@@ -131,7 +112,6 @@
         confirmTopup: "Create a top-up order and continue to payment?",
         confirmRenewOn: "Enable balance auto-renew? Renewal will create an official order.",
         confirmRenewOff: "Disable auto-renew?",
-        polling: "Syncing payment result…",
         streak: "Streak",
         notice: "Note",
         page: "Page",
@@ -140,7 +120,12 @@
         filter: "Filter",
         exportCsv: "Export CSV",
         all: "All",
-        officialWallet: "My Wallet"
+        officialWallet: "My Wallet",
+        statusEnabled: "Enabled",
+        statusDisabled: "Disabled",
+        enableAction: "Enable",
+        disableAction: "Disable",
+        none: "None"
       }
     };
     var extra = EXTRA_I18N.wallet || {};
@@ -348,30 +333,39 @@
   function toast(message, tone) {
     ensureToastHost();
     var el = document.createElement("div");
-    el.className = "n-message n-message--" + (tone || "info") + " xc-wallet-toast";
+    el.className = "xc-wallet-toast" + (tone ? " is-" + tone : "");
     el.textContent = message;
     dom.toast.appendChild(el);
     setTimeout(function () { el.remove(); }, 3200);
   }
 
   function ensureToastHost() {
-    if (dom.toast) return;
+    if (dom.toast && document.body.contains(dom.toast)) return;
     dom.toast = document.createElement("div");
-    dom.toast.className = "n-message-container xc-wallet-toast-stack";
+    dom.toast.className = "xc-wallet-toast-stack";
     document.body.appendChild(dom.toast);
   }
 
-  function ensurePanel() {
-    if (dom.panel) return;
-    dom.panel = document.createElement("section");
-    dom.panel.className = "n-card n-card--bordered xc-wallet-panel rounded-md";
-    dom.panel.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
-    dom.panel.addEventListener("click", onClick);
-    dom.panel.addEventListener("change", onChange);
+  function ensureRoot() {
+    if (dom.root && document.body.contains(dom.root) && dom.panel) return;
+    if (!dom.root) {
+      dom.root = document.createElement("div");
+      dom.root.id = "xc-wallet-root";
+      dom.root.hidden = true;
+    }
+    if (!dom.panel) {
+      dom.panel = document.createElement("section");
+      dom.panel.className = "xc-wallet-panel";
+      dom.panel.addEventListener("click", onClick);
+      dom.panel.addEventListener("change", onChange);
+      dom.panel.addEventListener("submit", onSubmit);
+      dom.root.appendChild(dom.panel);
+    }
+    if (!document.body.contains(dom.root)) document.body.appendChild(dom.root);
   }
 
   function findOfficialWalletCard() {
-    var nodes = document.querySelectorAll(".n-card-header__main, .n-card-header");
+    var nodes = document.querySelectorAll("#app .n-card-header__main, #app .n-card-header");
     for (var i = 0; i < nodes.length; i += 1) {
       var label = (nodes[i].textContent || "").trim();
       if (!label) continue;
@@ -382,35 +376,104 @@
     return null;
   }
 
-  function findContentHost() {
-    return document.querySelector(".n-layout-content .n-spin-content")
-      || document.querySelector(".n-layout-content")
-      || document.getElementById("app");
+  function clearWalletCardGap() {
+    var marked = document.querySelectorAll("[data-xc-wallet-gap]");
+    for (var i = 0; i < marked.length; i += 1) {
+      marked[i].style.marginBottom = "";
+      marked[i].removeAttribute("data-xc-wallet-gap");
+    }
   }
 
-  function mountPanel() {
-    ensurePanel();
+  function sampleTheme(card) {
+    if (!dom.panel) return;
+    try {
+      if (card) {
+        var cs = window.getComputedStyle(card);
+        if (cs.backgroundColor) dom.panel.style.setProperty("--xc-card-bg", cs.backgroundColor);
+        if (cs.borderRadius) dom.panel.style.setProperty("--xc-card-radius", cs.borderRadius);
+        if (cs.boxShadow && cs.boxShadow !== "none") dom.panel.style.setProperty("--xc-card-shadow", cs.boxShadow);
+        if (parseFloat(cs.borderTopWidth || "0") > 0 && cs.borderTopColor) {
+          dom.panel.style.setProperty("--xc-card-border", cs.borderTopColor);
+        }
+        if (cs.color && cs.color !== "rgb(0, 0, 0)") dom.panel.style.setProperty("--xc-text", cs.color);
+      }
+      var title = card && card.querySelector(".n-card-header__main");
+      if (title) {
+        var ts = window.getComputedStyle(title);
+        if (ts.color) dom.panel.style.setProperty("--xc-title-color", ts.color);
+        if (ts.fontSize) dom.panel.style.setProperty("--xc-title-size", ts.fontSize);
+      }
+      var btn = document.querySelector("#app .n-button--primary-type");
+      if (btn) {
+        var bs = window.getComputedStyle(btn);
+        if (bs.backgroundColor) dom.panel.style.setProperty("--xc-accent", bs.backgroundColor);
+        if (bs.color) dom.panel.style.setProperty("--xc-accent-text", bs.color);
+        if (bs.borderRadius) dom.panel.style.setProperty("--xc-btn-radius", bs.borderRadius);
+      }
+    } catch (error) {}
+  }
+
+  function syncPlacement() {
+    ensureRoot();
     if (!state.route.isWallet || isAuthPath(state.route.path)) {
-      if (dom.panel.parentElement) dom.panel.remove();
-      return;
+      dom.root.hidden = true;
+      clearWalletCardGap();
+      return false;
     }
     var card = findOfficialWalletCard();
-    if (card && card.parentElement) {
-      if (dom.panel.previousElementSibling !== card) {
-        card.insertAdjacentElement("afterend", dom.panel);
-      }
-      return true;
+    if (!card) {
+      dom.root.hidden = true;
+      return false;
     }
-    var host = findContentHost();
-    if (host && dom.panel.parentElement !== host) {
-      host.appendChild(dom.panel);
+    sampleTheme(card);
+    var rect = card.getBoundingClientRect();
+    if (rect.width < 80) {
+      dom.root.hidden = true;
+      return false;
     }
-    return !!card;
+    dom.root.hidden = false;
+    dom.root.style.left = Math.max(0, rect.left) + "px";
+    dom.root.style.width = rect.width + "px";
+    dom.root.style.top = (rect.bottom + 16) + "px";
+    var height = dom.panel ? dom.panel.offsetHeight : 0;
+    card.setAttribute("data-xc-wallet-gap", "1");
+    card.style.marginBottom = Math.max(24, height + 24) + "px";
+    return true;
+  }
+
+  function schedulePlace() {
+    if (placeTimer) return;
+    placeTimer = window.requestAnimationFrame(function () {
+      placeTimer = 0;
+      syncPlacement();
+    });
+  }
+
+  function currentSection() {
+    return state.section || state.route.section || "checkin";
+  }
+
+  function setSection(section) {
+    state.section = section || "checkin";
+    var params = ["section=" + encodeURIComponent(state.section)];
+    if (state.route.tradeNo && state.section === "topup") {
+      params.push("topup_trade_no=" + encodeURIComponent(state.route.tradeNo));
+    }
+    var next = "#" + OFFICIAL_PATH + "?" + params.join("&");
+    if (location.hash !== next) {
+      history.replaceState(null, "", location.pathname + location.search + next);
+      state.route = parseHash(location.hash);
+    }
+    render();
   }
 
   function onClick(event) {
     var btn = event.target.closest("[data-xc]");
-    if (!btn) return;
+    if (!btn || (dom.panel && !dom.panel.contains(btn))) return;
+    var tag = (btn.tagName || "").toLowerCase();
+    if (tag === "select" || tag === "input" || tag === "textarea") return;
+    event.preventDefault();
+    event.stopPropagation();
     var action = btn.getAttribute("data-xc");
     if (action === "refresh") load(true);
     if (action === "login") location.hash = "#/login";
@@ -426,34 +489,28 @@
       }
     }
     if (action === "export") exportCsv(btn.getAttribute("data-key"));
-    if (action === "section") {
-      var section = btn.getAttribute("data-section") || "";
-      var hash = "#" + OFFICIAL_PATH + (section ? "?section=" + encodeURIComponent(section) : "");
-      location.hash = hash;
-    }
+    if (action === "section") setSection(btn.getAttribute("data-section") || "checkin");
   }
 
   function onChange(event) {
     var el = event.target;
-    if (!el || !el.getAttribute) return;
-    if (el.getAttribute("data-xc") === "filter") {
-      var key = el.getAttribute("data-key");
-      if (key) {
-        state.filters[key] = el.value || "all";
-        state.pages[key] = 1;
-        load(true);
-      }
-    }
+    if (!el || el.getAttribute("data-xc") !== "filter") return;
+    var key = el.getAttribute("data-key");
+    if (!key) return;
+    state.filters[key] = el.value || "all";
+    state.pages[key] = 1;
+    load(true);
   }
 
-  function nButton(label, attrs, type) {
+  function onSubmit(event) {
+    event.preventDefault();
+    if ((event.target && event.target.getAttribute("data-xc")) === "topup-form") createTopup();
+  }
+
+  function btn(label, attrs, kind) {
     var extra = attrs || "";
-    var kind = type || "default";
-    return '<button type="button" class="n-button n-button--' + kind + '-type n-button--medium-type" ' + extra + "><span class=\"n-button__content\">" + esc(label) + "</span></button>";
-  }
-
-  function nTag(label, type) {
-    return '<span class="n-tag n-tag--' + (type || "default") + '">' + esc(label) + "</span>";
+    var cls = "xc-wallet-btn" + (kind === "ghost" || kind === "default" ? " xc-wallet-btn--" + kind : "");
+    return '<button type="button" class="' + cls + '" ' + extra + ">" + esc(label) + "</button>";
   }
 
   function isFeatureDisabled(error) {
@@ -466,19 +523,19 @@
     var page = Number((pack && pack.page) || state.pages[key] || 1);
     var last = Number((pack && pack.last_page) || 1);
     var total = Number((pack && pack.total) || 0);
-    return '<div class="n-pagination xc-wallet-pager" dir="' + (isRtlLocale(state.locale) ? "rtl" : "ltr") + '">'
-      + nButton(t("prev"), 'data-xc="page" data-key="' + key + '" data-page="' + Math.max(1, page - 1) + '"' + (page <= 1 ? " disabled" : ""))
+    return '<div class="xc-wallet-pager">'
+      + btn(t("prev"), 'data-xc="page" data-key="' + key + '" data-page="' + Math.max(1, page - 1) + '"' + (page <= 1 ? " disabled" : ""), "ghost")
       + '<span class="xc-wallet-pager__info">' + esc(t("page")) + " " + page + " / " + last + " · " + total + "</span>"
-      + nButton(t("nextPage"), 'data-xc="page" data-key="' + key + '" data-page="' + Math.min(last, page + 1) + '"' + (page >= last ? " disabled" : ""))
-      + nButton(t("exportCsv"), 'data-xc="export" data-key="' + key + '"', "primary")
+      + btn(t("nextPage"), 'data-xc="page" data-key="' + key + '" data-page="' + Math.min(last, page + 1) + '"' + (page >= last ? " disabled" : ""), "ghost")
+      + btn(t("exportCsv"), 'data-xc="export" data-key="' + key + '"', "ghost")
       + "</div>";
   }
 
   function listItems(items) {
     if (!items || !items.length) {
-      return '<div class="n-empty"><div class="n-empty__description">' + esc(t("empty")) + "</div></div>";
+      return '<div class="xc-wallet-empty">' + esc(t("empty")) + "</div>";
     }
-    return '<div class="n-list">' + items.join("") + "</div>";
+    return '<div class="xc-wallet-list">' + items.join("") + "</div>";
   }
 
   function paymentIcon(method) {
@@ -509,26 +566,23 @@
   }
 
   function render() {
-    applyThemeTokens();
-    if (typeof window.__xboardCustomApplyLocaleDirection === "function") {
-      window.__xboardCustomApplyLocaleDirection(normalizeLocale(state.locale));
-    }
+    ensureRoot();
     if (!state.route.isWallet) {
-      if (dom.panel && dom.panel.parentElement) dom.panel.remove();
+      dom.root.hidden = true;
+      clearWalletCardGap();
       return;
     }
-    var mounted = mountPanel();
-    if (!mounted) scheduleMount();
-    if (!dom.panel) return;
     var draft = state.loading ? null : captureDraft();
     dom.panel.setAttribute("dir", isRtlLocale(state.locale) ? "rtl" : "ltr");
 
     if (state.loading) {
-      dom.panel.innerHTML = '<div class="n-card-header"><div class="n-card-header__main">' + esc(t("title")) + '</div></div><div class="n-card__content"><div class="n-spin-container">' + esc(t("loading")) + "</div></div>";
+      dom.panel.innerHTML = '<div class="xc-wallet-head"><div><h2>' + esc(t("title")) + "</h2></div></div><div class=\"xc-wallet-body\"><p class=\"xc-wallet-note\">" + esc(t("loading")) + "</p></div>";
+      schedulePlace();
       return;
     }
     if (!state.authed) {
-      dom.panel.innerHTML = '<div class="n-card-header"><div class="n-card-header__main">' + esc(t("title")) + '</div></div><div class="n-card__content"><p>' + esc(t("login")) + "</p>" + nButton(t("toLogin"), 'data-xc="login"', "primary") + "</div>";
+      dom.panel.innerHTML = '<div class="xc-wallet-head"><div><h2>' + esc(t("title")) + "</h2></div></div><div class=\"xc-wallet-body\"><p class=\"xc-wallet-note\">" + esc(t("login")) + "</p>" + btn(t("toLogin"), 'data-xc="login"') + "</div>";
+      schedulePlace();
       return;
     }
 
@@ -538,91 +592,82 @@
     var autoConfig = autoCfg.config || {};
     var autoSub = autoCfg.subscription || {};
     var range = topMethods.amount_range || {};
-    var section = state.route.section || "checkin";
+    var section = currentSection();
 
     var tabs = ["checkin", "topup", "renew"].map(function (key) {
-      var active = section === key ? " n-button--primary-type" : " n-button--default-type";
-      return '<button type="button" class="n-button n-button--medium-type' + active + '" data-xc="section" data-section="' + key + '"><span class="n-button__content">' + esc(t(key)) + "</span></button>";
+      return '<button type="button" class="xc-wallet-tab' + (section === key ? " is-active" : "") + '" data-xc="section" data-section="' + key + '">' + esc(t(key)) + "</button>";
     }).join("");
 
     var checkinBody = isFeatureDisabled(state.checkin.error)
-      ? nTag(t("disabledFeature"), "warning")
-      : '<p>' + esc(ck.notice || t("notice")) + "</p>"
-        + "<p>" + esc(t("range")) + ": " + esc(money((ck.reward_range || {}).min || 0)) + " ~ " + esc(money((ck.reward_range || {}).max || 0)) + "</p>"
-        + (ck.streak_days ? "<p>" + esc(t("streak")) + ": " + esc(String(ck.streak_days)) + "</p>" : "")
-        + nButton(ck.today_claimed ? t("claimed") : t("claim"), 'data-xc="claim"' + (ck.today_claimed ? " disabled" : ""), ck.today_claimed ? "default" : "primary");
+      ? '<span class="xc-wallet-tag xc-wallet-tag--warning">' + esc(t("disabledFeature")) + "</span>"
+      : '<p class="xc-wallet-note">' + esc(ck.notice || t("notice")) + "</p>"
+        + '<p class="xc-wallet-meta">' + esc(t("range")) + ": " + esc(money((ck.reward_range || {}).min || 0)) + " ~ " + esc(money((ck.reward_range || {}).max || 0)) + "</p>"
+        + (ck.streak_days ? '<p class="xc-wallet-meta">' + esc(t("streak")) + ": " + esc(String(ck.streak_days)) + "</p>" : "")
+        + '<div class="xc-wallet-actions">' + btn(ck.today_claimed ? t("claimed") : t("claim"), 'data-xc="claim"' + (ck.today_claimed ? " disabled" : "")) + "</div>";
 
     var methods = (topMethods.payment_channels || []).map(function (method, index) {
       var feeParts = [];
       if (Number(method.handling_fee_percent)) feeParts.push(Number(method.handling_fee_percent) + "%");
       if (Number(method.handling_fee_fixed)) feeParts.push(money(method.handling_fee_fixed));
       var checked = index === 0 ? " checked" : "";
-      return '<label class="n-radio-wrapper xc-wallet-pay">'
-        + '<input class="n-radio" type="radio" name="xc_topup" value="' + esc(String(method.id)) + '"' + checked + " />"
+      return '<label class="xc-wallet-pay">'
+        + '<input type="radio" name="xc_topup" value="' + esc(String(method.id)) + '"' + checked + " />"
         + paymentIcon(method)
-        + '<span><strong>' + esc(method.name || method.payment || "Payment") + "</strong><small>" + esc(method.payment || "") + (feeParts.length ? " · " + esc(t("fee") + ": " + feeParts.join(" + ")) : "") + "</small></span>"
+        + "<span><strong>" + esc(method.name || method.payment || "Payment") + "</strong><small>" + esc(method.payment || "") + (feeParts.length ? " · " + esc(t("fee") + ": " + feeParts.join(" + ")) : "") + "</small></span>"
         + "</label>";
     }).join("");
 
     var topupBody = isFeatureDisabled(state.topup.error)
-      ? nTag(t("disabledFeature"), "warning")
-      : '<div class="n-input n-input--resizable"><input id="xc-topup-amount" class="n-input__input-el" inputmode="decimal" placeholder="' + esc((range.min ? String(Number(range.min) / 100) : "10")) + '" /></div>'
-        + "<p>" + esc(t("amountMin")) + ": " + esc(money(range.min || 0)) + " · " + esc(t("amountMax")) + ": " + esc(money(range.max || 0)) + "</p>"
-        + "<p>" + esc(t("refreshHint")) + "</p>"
-        + '<div class="n-radio-group">' + methods + "</div>"
-        + nButton(t("create"), 'data-xc="topup"', "primary");
+      ? '<span class="xc-wallet-tag xc-wallet-tag--warning">' + esc(t("disabledFeature")) + "</span>"
+      : '<form data-xc="topup-form"><input id="xc-topup-amount" class="xc-wallet-input" inputmode="decimal" placeholder="' + esc((range.min ? String(Number(range.min) / 100) : "10")) + '" />'
+        + '<p class="xc-wallet-meta">' + esc(t("amountMin")) + ": " + esc(money(range.min || 0)) + " · " + esc(t("amountMax")) + ": " + esc(money(range.max || 0)) + "</p>"
+        + '<p class="xc-wallet-note">' + esc(t("refreshHint")) + "</p>"
+        + '<div class="xc-wallet-pay-list">' + methods + "</div>"
+        + '<div class="xc-wallet-actions">' + btn(t("create"), 'data-xc="topup"') + "</div></form>";
 
     var renewBody = isFeatureDisabled(state.renew.error)
-      ? nTag(t("disabledFeature"), "warning")
-      : nTag(autoConfig.enabled ? t("statusEnabled") : t("statusDisabled"), autoConfig.enabled ? "success" : "warning")
-        + "<p>" + esc(t("amount")) + ": " + esc(money(autoSub.amount || 0)) + "</p>"
-        + "<p>" + esc(t("next")) + ": " + esc(autoConfig.next_scan_at ? time(autoConfig.next_scan_at) : "--") + "</p>"
-        + "<p>" + esc(t("result")) + ": " + esc(autoConfig.last_result || t("none")) + "</p>"
-        + nButton(autoConfig.enabled ? t("disableAction") : t("enableAction"), 'data-xc="renew" data-enabled="' + (autoConfig.enabled ? "1" : "0") + '"', autoConfig.enabled ? "default" : "primary");
+      ? '<span class="xc-wallet-tag xc-wallet-tag--warning">' + esc(t("disabledFeature")) + "</span>"
+      : '<span class="xc-wallet-tag ' + (autoConfig.enabled ? "xc-wallet-tag--success" : "xc-wallet-tag--warning") + '">' + esc(autoConfig.enabled ? t("statusEnabled") : t("statusDisabled")) + "</span>"
+        + '<p class="xc-wallet-meta">' + esc(t("amount")) + ": " + esc(money(autoSub.amount || 0)) + "</p>"
+        + '<p class="xc-wallet-meta">' + esc(t("next")) + ": " + esc(autoConfig.next_scan_at ? time(autoConfig.next_scan_at) : "--") + "</p>"
+        + '<p class="xc-wallet-meta">' + esc(t("result")) + ": " + esc(autoConfig.last_result || t("none")) + "</p>"
+        + '<div class="xc-wallet-actions">' + btn(autoConfig.enabled ? t("disableAction") : t("enableAction"), 'data-xc="renew" data-enabled="' + (autoConfig.enabled ? "1" : "0") + '"', autoConfig.enabled ? "ghost" : "") + "</div>";
 
     var ckPack = state.checkin.history || {};
     var topPack = state.topup.history || {};
     var renewPack = state.renew.history || {};
     var ckItems = (ckPack.records || []).map(function (record) {
-      return '<div class="n-list-item"><div class="n-list-item__main">' + esc(record.claim_date || "--") + " · " + esc(money(record.reward_amount || 0)) + "</div></div>";
+      return '<div class="xc-wallet-row"><div>' + esc(record.claim_date || "--") + " · " + esc(money(record.reward_amount || 0)) + "</div></div>";
     });
     var topItems = (topPack.records || []).map(function (record) {
-      return '<div class="n-list-item"><div class="n-list-item__main">' + esc(record.trade_no || "--") + " · " + esc(money(record.amount || 0)) + "</div>" + nTag(record.status_label || "--") + "</div>";
+      return '<div class="xc-wallet-row"><div>' + esc(record.trade_no || "--") + " · " + esc(money(record.amount || 0)) + '</div><span class="xc-wallet-tag">' + esc(record.status_label || "--") + "</span></div>";
     });
     var renewItems = (renewPack.records || []).map(function (record) {
-      return '<div class="n-list-item"><div class="n-list-item__main">' + esc(record.status_label || "--") + " · " + esc(money(record.amount || 0)) + "</div><small>" + esc(record.reason_message || record.reason || "--") + "</small></div>";
+      return '<div class="xc-wallet-row"><div>' + esc(record.status_label || "--") + " · " + esc(money(record.amount || 0)) + "<small>" + esc(record.reason_message || record.reason || "--") + "</small></div></div>";
     });
 
-    var filter = function (key) {
-      return '<label class="xc-wallet-filter">' + esc(t("filter")) + ' <select class="n-base-selection" data-xc="filter" data-key="' + key + '">'
-        + '<option value="all"' + (state.filters[key] === "all" ? " selected" : "") + ">" + esc(t("all")) + "</option>"
-        + '<option value="paid"' + (state.filters[key] === "paid" ? " selected" : "") + ">paid</option>"
-        + '<option value="pending"' + (state.filters[key] === "pending" ? " selected" : "") + ">pending</option>"
-        + '<option value="expired"' + (state.filters[key] === "expired" ? " selected" : "") + ">expired</option>"
-        + '<option value="success"' + (state.filters[key] === "success" ? " selected" : "") + ">success</option>"
-        + '<option value="failed"' + (state.filters[key] === "failed" ? " selected" : "") + ">failed</option>"
+    var filter = function (key, options) {
+      return '<label class="xc-wallet-toolbar">' + esc(t("filter")) + ' <select class="xc-wallet-select" data-xc="filter" data-key="' + key + '">'
+        + options.map(function (value) {
+          var label = value === "all" ? t("all") : value;
+          return '<option value="' + esc(value) + '"' + (state.filters[key] === value ? " selected" : "") + ">" + esc(label) + "</option>";
+        }).join("")
         + "</select></label>";
     };
 
     var bodies = {
-      checkin: checkinBody + "<h4>" + esc(t("history")) + "</h4>" + listItems(ckItems) + pager("checkin", ckPack),
-      topup: topupBody + "<h4>" + esc(t("history")) + "</h4>" + filter("topup") + listItems(topItems) + pager("topup", topPack),
-      renew: renewBody + "<h4>" + esc(t("history")) + "</h4>" + filter("renew") + listItems(renewItems) + pager("renew", renewPack)
+      checkin: checkinBody + '<h3 class="xc-wallet-h">' + esc(t("history")) + "</h3>" + listItems(ckItems) + pager("checkin", ckPack),
+      topup: topupBody + '<h3 class="xc-wallet-h">' + esc(t("history")) + "</h3>" + filter("topup", ["all", "paid", "pending", "expired"]) + listItems(topItems) + pager("topup", topPack),
+      renew: renewBody + '<h3 class="xc-wallet-h">' + esc(t("history")) + "</h3>" + filter("renew", ["all", "success", "failed", "skipped"]) + listItems(renewItems) + pager("renew", renewPack)
     };
 
     dom.panel.innerHTML = ""
-      + '<div class="n-card-header"><div class="n-card-header__main">' + esc(t("title")) + '</div><div class="n-card-header__extra">' + nButton(t("refresh"), 'data-xc="refresh"') + "</div></div>"
-      + '<div class="n-card__content">'
-      + '<p class="n-card__footer">' + esc(t("subtitle")) + "</p>"
-      + '<div class="n-button-group xc-wallet-tabs">' + tabs + "</div>"
-      + '<div class="xc-wallet-section" id="xc-section-' + esc(section) + '">' + (bodies[section] || bodies.checkin) + "</div>"
-      + "</div>";
+      + '<div class="xc-wallet-head"><div><h2>' + esc(t("title")) + "</h2><p>" + esc(t("subtitle")) + "</p></div>"
+      + btn(t("refresh"), 'data-xc="refresh"', "ghost") + "</div>"
+      + '<nav class="xc-wallet-tabs">' + tabs + "</nav>"
+      + '<div class="xc-wallet-body">' + (bodies[section] || bodies.checkin) + "</div>";
     restoreDraft(draft);
-  }
-
-  function applyThemeTokens() {
-    var color = (window.settings && window.settings.theme && window.settings.theme.color) || "default";
-    if (document.body) document.body.dataset.xcTheme = color;
+    schedulePlace();
   }
 
   function amountCents(value) {
@@ -682,9 +727,9 @@
   }
 
   function csvCell(value) {
-    var text = String(value == null ? "" : value);
-    if (/[",\n\r]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
-    return text;
+    var textValue = String(value == null ? "" : value);
+    if (/[",\n\r]/.test(textValue)) return '"' + textValue.replace(/"/g, '""') + '"';
+    return textValue;
   }
 
   function exportCsv(key) {
@@ -727,7 +772,7 @@
     if (!state.route.isWallet && !force) {
       return render();
     }
-    var showSpinner = !state.authed || !dom.panel || !dom.panel.parentElement;
+    var showSpinner = !state.authed || !dom.panel || !dom.panel.innerHTML;
     if (showSpinner) {
       state.loading = true;
       render();
@@ -778,40 +823,31 @@
     topupPollTimer = setTimeout(function () { load(true); }, 3000);
   }
 
-  function scheduleMount() {
-    if (mountTimer) return;
-    mountTimer = setTimeout(function () {
-      mountTimer = 0;
-      if (!state.route.isWallet) return;
-      var existed = !!(dom.panel && dom.panel.parentElement && dom.panel.innerHTML);
-      mountPanel();
-      if (!existed) render();
-    }, 250);
-  }
-
   function sync() {
     state.locale = detectLocale();
     canonicalizeWalletHash();
     state.route = parseHash(location.hash);
+    if (state.route.section) state.section = state.route.section;
     load(false);
   }
 
   function init() {
     canonicalizeWalletHash();
     state.route = parseHash(location.hash);
+    if (state.route.section) state.section = state.route.section;
+    ensureRoot();
     load(false);
     if (document.body) {
       var observer = new MutationObserver(function () {
-        if (state.route.isWallet) scheduleMount();
+        if (!state.route.isWallet) return;
+        if (dom.root && !document.body.contains(dom.root)) document.body.appendChild(dom.root);
+        schedulePlace();
       });
       observer.observe(document.body, { childList: true, subtree: true });
     }
     addEventListener("hashchange", sync);
-    addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && state.route.section) {
-        location.hash = "#" + OFFICIAL_PATH;
-      }
-    });
+    addEventListener("scroll", schedulePlace, true);
+    addEventListener("resize", schedulePlace);
   }
 
   if (document.readyState === "loading") {
