@@ -27,6 +27,7 @@
   };
   var dom = {};
   var placeTimer = 0;
+  var findTimer = 0;
   var topupPollTimer = 0;
 
   function buildTextCatalog() {
@@ -423,12 +424,14 @@
     var card = findOfficialWalletCard();
     if (!card) {
       dom.root.hidden = true;
+      startFindLoop();
       return false;
     }
     sampleTheme(card);
     var rect = card.getBoundingClientRect();
     if (rect.width < 80) {
       dom.root.hidden = true;
+      startFindLoop();
       return false;
     }
     dom.root.hidden = false;
@@ -447,6 +450,19 @@
       placeTimer = 0;
       syncPlacement();
     });
+  }
+
+  function startFindLoop() {
+    if (findTimer || !state.route.isWallet) return;
+    var tries = 0;
+    findTimer = setInterval(function () {
+      tries += 1;
+      var placed = syncPlacement();
+      if (placed || !state.route.isWallet || tries >= 80) {
+        clearInterval(findTimer);
+        findTimer = 0;
+      }
+    }, 200);
   }
 
   function currentSection() {
@@ -829,6 +845,7 @@
     state.route = parseHash(location.hash);
     if (state.route.section) state.section = state.route.section;
     load(false);
+    startFindLoop();
   }
 
   function init() {
@@ -837,6 +854,7 @@
     if (state.route.section) state.section = state.route.section;
     ensureRoot();
     load(false);
+    startFindLoop();
     if (document.body) {
       var observer = new MutationObserver(function () {
         if (!state.route.isWallet) return;

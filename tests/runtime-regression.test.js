@@ -51,6 +51,7 @@ test('Wallet hash canonicalizes legacy wallet query onto official profile', () =
   assert.match(source, /parsed\.path === "\/404" && \(parsed\.tradeNo \|\| lastTopup\)/);
   assert.match(source, /xc-wallet-root/);
   assert.match(source, /restoreDraft/);
+  assert.match(source, /function startFindLoop/);
 });
 
 test('Auth page state sync adds delayed corrections and clears auth locale layout off auth routes', () => {
@@ -82,6 +83,12 @@ test('Stripe and BEpusdt expose inspectNotification for shared webhook verificat
   assert.doesNotMatch(stripe, /OrderHandleJob::dispatchSync/);
   assert.doesNotMatch(bepusdt, /OrderHandleJob::dispatchSync/);
   assert.match(stripe, /\$paymentIntent\['metadata'\]\['trade_no'\]/);
+});
+
+test('Overlay deploy detects compose service named xboard', () => {
+  const source = readSource('scripts/deploy-overlay.sh');
+  assert.match(source, /resolve_web_service/);
+  assert.match(source, /xboard web app laravel php/);
 });
 
 test('WalletCenter controllers extend official PluginController', () => {

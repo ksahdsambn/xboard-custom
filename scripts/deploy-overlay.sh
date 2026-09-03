@@ -3,7 +3,7 @@ set -euo pipefail
 
 CUSTOM_ROOT="${CUSTOM_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 OFFICIAL_ROOT="${OFFICIAL_ROOT:-}"
-WEB_SERVICE="${WEB_SERVICE:-web}"
+WEB_SERVICE="${WEB_SERVICE:-}"
 HORIZON_SERVICE="${HORIZON_SERVICE-horizon}"
 THEME_NAME="${THEME_NAME:-XboardCustom}"
 THEME_TARGET_ROOT="${THEME_TARGET_ROOT:-storage/theme}"
@@ -52,12 +52,36 @@ sync_dir() {
   rsync "${rsync_args[@]}" "${source_dir}/" "${target_dir}/"
 }
 
-has_compose_service() {
-  local service_name="$1"
+compose_services() {
   (
     cd "${OFFICIAL_ROOT}"
-    "${COMPOSE_CMD[@]}" config --services 2>/dev/null | grep -qx "${service_name}"
+    "${COMPOSE_CMD[@]}" config --services 2>/dev/null
   )
+}
+
+has_compose_service() {
+  local service_name="$1"
+  compose_services | grep -qx "${service_name}"
+}
+
+resolve_web_service() {
+  if [[ -n "${WEB_SERVICE}" ]] && has_compose_service "${WEB_SERVICE}"; then
+    return 0
+  fi
+
+  local candidate
+  for candidate in xboard web app laravel php; do
+    if has_compose_service "${candidate}"; then
+      WEB_SERVICE="${candidate}"
+      echo "Using compose web service: ${WEB_SERVICE}"
+      return 0
+    fi
+  done
+
+  WEB_SERVICE="$(compose_services | head -n 1 || true)"
+  if [[ -n "${WEB_SERVICE}" ]]; then
+    echo "Using compose web service: ${WEB_SERVICE}"
+  fi
 }
 
 restart_service_if_exists() {
@@ -110,6 +134,8 @@ refresh_theme_if_possible() {
     "${COMPOSE_CMD[@]}" exec -T "${WEB_SERVICE}" php artisan tinker --execute="app(\App\Services\ThemeService::class)->refreshCurrentTheme();"
   )
 }
+
+resolve_web_service
 
 sync_dir "${CUSTOM_ROOT}/plugins/StripePayment" "${OFFICIAL_ROOT}/plugins/StripePayment"
 sync_dir "${CUSTOM_ROOT}/plugins/BepusdtPayment" "${OFFICIAL_ROOT}/plugins/BepusdtPayment"
