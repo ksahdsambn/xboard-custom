@@ -59,15 +59,24 @@ class WalletCenterPaymentChannelService
 
     public function findEnabledPaymentByMethodAndUuid(string $method, string $uuid): ?Payment
     {
+        return $this->findPaymentByMethodAndUuid($method, $uuid, true);
+    }
+
+    public function findPaymentByMethodAndUuid(string $method, string $uuid, bool $enabledOnly = false): ?Payment
+    {
         if ($method === '' || $uuid === '') {
             return null;
         }
 
-        return Payment::query()
+        $query = Payment::query()
             ->where('payment', $method)
-            ->where('uuid', $uuid)
-            ->where('enable', true)
-            ->first();
+            ->where('uuid', $uuid);
+
+        if ($enabledOnly) {
+            $query->where('enable', true);
+        }
+
+        return $query->first();
     }
 
     public function getChannelSnapshotByPaymentId(int $paymentId): ?array

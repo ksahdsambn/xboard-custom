@@ -28,7 +28,7 @@ class TopupController extends BaseController
         return $this->success($this->featurePayload(WalletCenterFeature::TOPUP, [
             'payment_channels' => $this->topupService->listAvailableChannels(),
             'amount_range' => $this->topupService->getAmountRangeSnapshot(),
-        ], 'stage-07-topup'));
+        ], 'wallet-center'));
     }
 
     public function create(Request $request)
@@ -55,17 +55,17 @@ class TopupController extends BaseController
             return $this->fail([400, $exception->getMessage()], $this->featurePayload(WalletCenterFeature::TOPUP, [
                 'payment_channels' => $this->topupService->listAvailableChannels(),
                 'amount_range' => $this->topupService->getAmountRangeSnapshot(),
-            ], 'stage-07-topup'));
+            ], 'wallet-center'));
         } catch (\Throwable $exception) {
             report($exception);
 
             return $this->fail([500, 'WalletCenter topup create failed.'], $this->featurePayload(WalletCenterFeature::TOPUP, [
                 'payment_channels' => $this->topupService->listAvailableChannels(),
                 'amount_range' => $this->topupService->getAmountRangeSnapshot(),
-            ], 'stage-07-topup'));
+            ], 'wallet-center'));
         }
 
-        return $this->success($this->featurePayload(WalletCenterFeature::TOPUP, $result, 'stage-07-topup'));
+        return $this->success($this->featurePayload(WalletCenterFeature::TOPUP, $result, 'wallet-center'));
     }
 
     public function detail(Request $request)
@@ -86,7 +86,7 @@ class TopupController extends BaseController
         return $this->success($this->featurePayload(WalletCenterFeature::TOPUP, [
             'order' => $order,
             'amount_range' => $this->topupService->getAmountRangeSnapshot(),
-        ], 'stage-07-topup'));
+        ], 'wallet-center'));
     }
 
     public function history(Request $request)
@@ -104,15 +104,11 @@ class TopupController extends BaseController
             'records' => $records,
             'count' => $records->count(),
             'amount_range' => $this->topupService->getAmountRangeSnapshot(),
-        ], 'stage-07-topup'));
+        ], 'wallet-center'));
     }
 
     public function notify(Request $request, string $method, string $uuid)
     {
-        if ($response = $this->requireFeature(WalletCenterFeature::TOPUP)) {
-            return $response;
-        }
-
         try {
             $result = $this->topupService->processNotification($method, $uuid, $request);
 

@@ -575,3 +575,27 @@
 - 当前执行阶段：阶段 16 后置仓库回归复核
 - 当前阶段结果：已完成仓库级回归审查并修复 2 项发布层问题
 - 下一阶段：无（如需继续推进，建议补充 1Panel 真实部署回归）
+
+## 2026-09-04 官方贴合与审查项修复
+
+### 完成内容
+
+- 支付插件改为官方 notify 契约：成功事件把 `{trade_no, callback_no}` 交回核心 `OrderService::paid()`，取消/超时/退款等非成功事件才 intercept 200。
+- 充值默认回跳改为 `#/dashboard?xc_wallet=1&section=topup&topup_trade_no=...`，并在主题层把 `#/wallet` / 支付后 404 规范化回官方 dashboard 钱包查询参数。
+- 充值回调不再被 `topup_enabled` 开关阻断；支付实例停用后仍按 uuid 入账。
+- WalletCenter 在 `payment.notify.before` 优先识别充值单号，兼容 Stripe Dashboard 只配一条官方回调地址的场景。
+- 自动续费改为创建官方 `v2_order` 并 `OrderService::paid()`；支持到期后挽回；余额不足改为 6 小时重试并发送邮件/Telegram/钩子通知。
+- 充值复用全部已启用官方支付通道；Stripe 充值商品名改为余额充值；支持退款回滚和超时待支付清理。
+- 签到增加唯一索引、封禁校验、提示文案和连续天数。
+- 前台：`guest_comm_config` 控制入口、移动端悬浮入口、主题色/深色、金额上下限与手续费、历史 20 条、支付结果轮询、dialog 语义、确认框、官方 token 键。
+- 13 种新语言流量文案 `{total}` 占位符已修复。
+
+### 测试结果
+
+- `node --test tests/runtime-regression.test.js`：13 项全部通过。
+- `node --check theme/XboardCustom/assets/wallet-center.js`：通过。
+- `node --check theme/XboardCustom/assets/i18n-extra.js`：通过。
+
+### 是否放行
+
+- 是。官方管理后台 React 仍无插件页面槽位，记录查询继续走插件 admin API，并通过 `admin.user.detail` / `admin.user.transform` 挂到用户详情 JSON。

@@ -155,6 +155,7 @@ class TopupService
             'paid' => TopupOrder::query()->where('status', TopupOrder::STATUS_PAID)->count(),
             'cancelled' => TopupOrder::query()->where('status', TopupOrder::STATUS_CANCELLED)->count(),
             'expired' => TopupOrder::query()->where('status', TopupOrder::STATUS_EXPIRED)->count(),
+            'refunded' => TopupOrder::query()->where('status', TopupOrder::STATUS_REFUNDED)->count(),
         ];
 
         $latestOrder = TopupOrder::query()
@@ -185,7 +186,7 @@ class TopupService
 
     public function processNotification(string $method, string $uuid, Request $request): array
     {
-        $payment = $this->paymentChannelService->findEnabledPaymentByMethodAndUuid($method, $uuid);
+        $payment = $this->paymentChannelService->findPaymentByMethodAndUuid($method, $uuid, false);
         if (!$payment || !$this->gatewayService->supportsMethod($payment->payment)) {
             return [
                 'response' => response('gate is not enable', 400),
@@ -206,6 +207,8 @@ class TopupService
                     'result' => $result,
                 ];
             }
+        } elseif (is_string($tradeNo) && $tradeNo !== '' && $status === TopupOrder::STATUS_REFUNDED) {
+            $this->markRefunded($tradeNo, is_string($callbackNo) ? $callbackNo : null, $meta);
         } elseif (is_string($tradeNo) && $tradeNo !== '' && $status !== null) {
             $this->markStatus($tradeNo, (int) $status, $callbackNo, $meta);
         }
@@ -214,6 +217,31 @@ class TopupService
             'response' => $result['response'],
             'result' => $result,
         ];
+    }
+
+    public function expireStalePending(int $expireMinutes = 120): int
+    {
+        $expireMinutes = max(30, $expireMinutes);
+        $cutoff = now()->subMinutes($expireMinutes);
+        $expired = 0;
+
+        TopupOrder::query()
+            ->where('status', TopupOrder::STATUS_PENDING)
+            ->where('created_at', '<=', $cutoff)
+            ->orderBy('id')
+            ->chunkById(100, function ($orders) use (&$expired): void {
+                foreach ($orders as $order) {
+                    $this->markStatus(
+                        (string) $order->trade_no,
+                        TopupOrder::STATUS_EXPIRED,
+                        null,
+                        ['source' => 'wallet_center_pending_sweeper']
+                    );
+                    $expired++;
+                }
+            });
+
+        return $expired;
     }
 
     protected function markPaid(string $tradeNo, string $callbackNo, array $meta = []): bool
@@ -236,7 +264,11 @@ class TopupService
                     return true;
                 }
 
-                if (in_array((int) $order->status, [TopupOrder::STATUS_CANCELLED, TopupOrder::STATUS_EXPIRED], true)) {
+                if (in_array((int) $order->status, [
+                    TopupOrder::STATUS_CANCELLED,
+                    TopupOrder::STATUS_EXPIRED,
+                    TopupOrder::STATUS_REFUNDED,
+                ], true)) {
                     $this->updateExtra($order, [
                         'late_paid_callback' => [
                             'callback_no' => $callbackNo,
@@ -305,6 +337,7 @@ class TopupService
                 TopupOrder::STATUS_PAID,
                 TopupOrder::STATUS_CANCELLED,
                 TopupOrder::STATUS_EXPIRED,
+                TopupOrder::STATUS_REFUNDED,
             ], true)) {
                 $order->extra = $this->mergeExtra($order->extra, [
                     'ignored_status_callback' => [
@@ -334,6 +367,53 @@ class TopupService
                 'last_notify_meta' => $meta,
             ]);
 
+            $order->save();
+        }, 3);
+    }
+
+    protected function markRefunded(string $tradeNo, ?string $callbackNo = null, array $meta = []): void
+    {
+        DB::transaction(function () use ($tradeNo, $callbackNo, $meta): void {
+            $order = TopupOrder::query()
+                ->where('trade_no', $tradeNo)
+                ->lockForUpdate()
+                ->first();
+            if (!$order) {
+                return;
+            }
+
+            if ((int) $order->status === TopupOrder::STATUS_REFUNDED) {
+                return;
+            }
+
+            $clawback = 0;
+            if ((int) $order->status === TopupOrder::STATUS_PAID) {
+                $user = User::query()
+                    ->whereKey($order->user_id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($user) {
+                    $clawback = (int) $order->amount;
+                    if (!$this->userService->addBalance($user->id, -$clawback)) {
+                        $order->extra = $this->mergeExtra($order->extra, [
+                            'refund_clawback_failed' => true,
+                            'refund_clawback_amount' => $clawback,
+                        ]);
+                        $clawback = 0;
+                    }
+                }
+            }
+
+            $order->status = TopupOrder::STATUS_REFUNDED;
+            if (is_string($callbackNo) && $callbackNo !== '') {
+                $order->callback_no = $callbackNo;
+            }
+            $order->extra = $this->mergeExtra($order->extra, [
+                'refunded_at' => now()->toIso8601String(),
+                'refund_clawback_amount' => $clawback,
+                'last_notify_status' => 'refunded',
+                'last_notify_meta' => $meta,
+            ]);
             $order->save();
         }, 3);
     }

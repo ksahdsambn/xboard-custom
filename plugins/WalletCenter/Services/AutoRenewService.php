@@ -6,6 +6,7 @@ use App\Exceptions\ApiException;
 use App\Models\Order;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\OrderService;
 use App\Services\PlanService;
 use App\Services\UserService;
 use Carbon\Carbon;
@@ -25,7 +26,8 @@ class AutoRenewService
 
     public function __construct(
         protected WalletCenterConfigService $configService,
-        protected UserService $userService
+        protected UserService $userService,
+        protected WalletCenterNotificationService $notificationService
     ) {
     }
 
@@ -211,7 +213,7 @@ class AutoRenewService
     protected function processSetting(AutoRenewSetting $setting): ?AutoRenewRecord
     {
         try {
-            return DB::transaction(function () use ($setting): ?AutoRenewRecord {
+            $record = DB::transaction(function () use ($setting): ?AutoRenewRecord {
                 $lockedSetting = AutoRenewSetting::query()
                     ->whereKey($setting->id)
                     ->lockForUpdate()
@@ -268,6 +270,13 @@ class AutoRenewService
                 }
 
                 if ($context['balance'] < $context['amount']) {
+                    if ($this->shouldSuppressDuplicateFailure($lockedUser->id, 'insufficient_balance')) {
+                        $lockedSetting->next_scan_at = $this->resolveNextAttemptAt($context, 'insufficient_balance');
+                        $lockedSetting->save();
+
+                        return null;
+                    }
+
                     $record = $this->createRecord(
                         $lockedSetting,
                         $context,
@@ -286,17 +295,8 @@ class AutoRenewService
 
                 $balanceBefore = $context['balance'];
                 $expiredAtBefore = $context['expired_at'];
-
-                if (!$this->userService->addBalance($lockedUser->id, -$context['amount'])) {
-                    throw new \RuntimeException('WalletCenter auto renew balance debit failed.');
-                }
-
+                $renewal = $this->applyOfficialRenewal($lockedUser, $context['plan'], $context['period']);
                 $lockedUser->refresh();
-
-                $this->applyRenewal($lockedUser, $context['plan'], $context['period'], $expiredAtBefore);
-                if (!$lockedUser->save()) {
-                    throw new \RuntimeException('WalletCenter auto renew user save failed.');
-                }
 
                 $refreshedContext = $this->resolveContext($lockedUser, $lockedSetting);
                 $record = $this->createRecord(
@@ -309,6 +309,9 @@ class AutoRenewService
                         'balance_after' => (int) ($lockedUser->balance ?? 0),
                         'expired_at_before' => $expiredAtBefore,
                         'expired_at_after' => (int) ($lockedUser->expired_at ?? 0),
+                        'core_order_id' => $renewal['core_order_id'] ?? null,
+                        'core_trade_no' => $renewal['core_trade_no'] ?? null,
+                        'official_paid' => true,
                     ],
                     $refreshedContext['next_scan_at']
                 );
@@ -316,10 +319,42 @@ class AutoRenewService
 
                 return $record;
             }, 3);
+
+            $this->notifyProcessedRecord($record);
+
+            return $record;
         } catch (\Throwable $exception) {
             Log::error($exception);
 
             return $this->recordUnexpectedFailure($setting);
+        }
+    }
+
+    protected function notifyProcessedRecord(?AutoRenewRecord $record): void
+    {
+        if (!$record) {
+            return;
+        }
+
+        $user = User::query()->find($record->user_id);
+        if (!$user) {
+            return;
+        }
+
+        try {
+            if ((int) $record->status === AutoRenewRecord::STATUS_SUCCESS) {
+                $this->notificationService->notifyAutoRenewSuccess($user, $record);
+                return;
+            }
+
+            if ($record->reason === 'insufficient_balance') {
+                $this->notificationService->notifyAutoRenewFailure($user, $record);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('WalletCenter auto renew notification failed', [
+                'record_id' => $record->id,
+                'message' => $exception->getMessage(),
+            ]);
         }
     }
 
@@ -347,7 +382,8 @@ class AutoRenewService
         $subscriptionActive = $this->isFiniteActiveSubscription($user);
         $reason = $this->resolveReason($user, $plan, $period, $amount);
         $renewable = $reason === null;
-        $isDue = $renewable && $dueAt && $dueAt->lessThanOrEqualTo($now);
+        $expired = $expiredAt !== null && $expiredAt <= time();
+        $isDue = $renewable && (($dueAt && $dueAt->lessThanOrEqualTo($now)) || $expired);
 
         return $this->buildContext(
             enabled: $enabled,
@@ -413,7 +449,9 @@ class AutoRenewService
             'balance' => (int) ($user->balance ?? 0),
             'expired_at' => $expiredAt,
             'due_at' => $dueAt,
-            'next_scan_at' => $renewable ? $dueAt : null,
+            'next_scan_at' => $renewable
+                ? (($expiredAt !== null && $expiredAt <= time()) ? now() : $dueAt)
+                : null,
             'renewable' => $renewable,
             'subscription_active' => $subscriptionActive,
             'is_due' => $isDue,
@@ -527,29 +565,51 @@ class AutoRenewService
         }, 3);
     }
 
-    protected function applyRenewal(User $user, Plan $plan, string $period, int $expiredAtBefore): void
+    protected function applyOfficialRenewal(User $user, Plan $plan, string $period): array
     {
-        $user->plan_id = $plan->id;
-        $user->group_id = $plan->group_id;
-        $user->speed_limit = $plan->speed_limit;
-        $user->device_limit = $plan->device_limit;
-        $user->transfer_enable = $plan->transfer_enable * 1073741824;
-        $user->expired_at = $this->calculateNextExpiredAt($period, $expiredAtBefore);
-    }
-
-    protected function calculateNextExpiredAt(string $period, int $expiredAtBefore): int
-    {
-        $periodKey = PlanService::getPeriodKey($period);
-        $periods = Plan::getAvailablePeriods();
-        $months = (int) ($periods[$periodKey]['value'] ?? 0);
-
-        if ($months <= 0) {
-            throw new \RuntimeException('WalletCenter auto renew period is invalid.');
+        try {
+            $order = OrderService::createFromRequest($user, $plan, $period, null);
+        } catch (ApiException $exception) {
+            throw new \RuntimeException($exception->getMessage(), 0, $exception);
         }
 
-        return $this->createFromTimestamp(max($expiredAtBefore, time()))
-            ->addMonths($months)
-            ->timestamp;
+        if ((int) $order->total_amount > 0) {
+            try {
+                (new OrderService($order))->cancel();
+            } catch (\Throwable) {
+            }
+
+            throw new \RuntimeException('WalletCenter auto renew requires full balance coverage.');
+        }
+
+        $orderService = new OrderService($order);
+        if (!$orderService->paid((string) $order->trade_no)) {
+            throw new \RuntimeException('WalletCenter auto renew official paid() failed.');
+        }
+
+        $user->refresh();
+
+        return [
+            'core_order_id' => $order->id,
+            'core_trade_no' => $order->trade_no,
+            'balance_amount' => (int) ($order->balance_amount ?? 0),
+            'expired_at_after' => (int) ($user->expired_at ?? 0),
+        ];
+    }
+
+    protected function shouldSuppressDuplicateFailure(int $userId, string $reason): bool
+    {
+        $latest = $this->getLatestRecordForUser($userId);
+        if (!$latest || $latest->reason !== $reason) {
+            return false;
+        }
+
+        $executedAt = $latest->executed_at;
+        if (!$executedAt instanceof Carbon) {
+            return false;
+        }
+
+        return $executedAt->gt(now()->subHours(6));
     }
 
     protected function getLatestRecordForUser(int $userId): ?AutoRenewRecord
@@ -625,13 +685,16 @@ class AutoRenewService
     {
         return !$user->banned
             && $user->plan_id !== null
-            && (int) ($user->transfer_enable ?? 0) > 0
             && $user->expired_at !== null
             && (int) $user->expired_at > time();
     }
 
     protected function resolveReason(User $user, ?Plan $plan, ?string $period, int $amount): ?string
     {
+        if ($user->banned) {
+            return 'user_banned';
+        }
+
         if ($user->plan_id === null || !$plan) {
             return 'plan_not_found';
         }
@@ -640,11 +703,8 @@ class AutoRenewService
             return 'onetime_subscription_not_supported';
         }
 
-        if (!$this->isFiniteActiveSubscription($user)) {
-            return 'subscription_not_active';
-        }
-
-        if (!$plan->renew) {
+        $expired = (int) $user->expired_at <= time();
+        if (!$expired && !$plan->renew) {
             return 'plan_not_renewable';
         }
 
@@ -681,19 +741,20 @@ class AutoRenewService
     protected function reasonToMessage(?string $reason): string
     {
         return match ($reason) {
-            'user_not_found' => 'WalletCenter auto renew user does not exist.',
-            'plan_not_found' => 'WalletCenter auto renew requires an active subscription plan.',
-            'subscription_not_active' => 'WalletCenter auto renew is only available for active subscriptions.',
-            'onetime_subscription_not_supported' => 'WalletCenter auto renew does not support one-time subscriptions.',
-            'plan_not_renewable' => 'WalletCenter auto renew requires a renewable subscription plan.',
-            'period_not_resolved' => 'WalletCenter auto renew could not resolve the current subscription period.',
-            'period_price_not_available' => 'WalletCenter auto renew could not resolve the current renewal amount.',
-            'pending_order_exists' => 'WalletCenter auto renew skipped because a core order is still pending.',
-            'insufficient_balance' => 'WalletCenter auto renew failed because the balance is insufficient.',
-            'runtime_error' => 'WalletCenter auto renew failed because of a runtime error.',
-            'disabled_by_user' => 'WalletCenter auto renew has been disabled.',
-            'renewed' => 'WalletCenter auto renew completed successfully.',
-            default => 'WalletCenter auto renew is not available.',
+            'user_not_found' => '自动续费用户不存在。',
+            'user_banned' => '账户已被封禁，无法自动续费。',
+            'plan_not_found' => '自动续费需要有效的订阅套餐。',
+            'subscription_not_active' => '自动续费仅适用于有效订阅。',
+            'onetime_subscription_not_supported' => '一次性订阅不支持自动续费。',
+            'plan_not_renewable' => '当前套餐不允许续费。',
+            'period_not_resolved' => '无法解析当前订阅周期。',
+            'period_price_not_available' => '无法解析当前续费金额。',
+            'pending_order_exists' => '存在未完成的核心订单，已跳过自动续费。',
+            'insufficient_balance' => '余额不足，自动续费未执行。',
+            'runtime_error' => '自动续费执行出错。',
+            'disabled_by_user' => '已关闭自动续费。',
+            'renewed' => '自动续费已通过官方订单开通完成。',
+            default => '当前无法使用自动续费。',
         };
     }
 
@@ -741,7 +802,8 @@ class AutoRenewService
         $now = now();
 
         return match ($reason) {
-            'pending_order_exists', 'insufficient_balance' => $now->copy()->addMinutes(self::SHORT_RETRY_MINUTES),
+            'pending_order_exists' => $now->copy()->addMinutes(15),
+            'insufficient_balance' => $now->copy()->addHours(6),
             'runtime_error',
             'user_not_found',
             'plan_not_found',

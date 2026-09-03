@@ -1,8 +1,8 @@
 {
     "name": "WalletCenter",
     "code": "wallet_center",
-    "version": "0.1.0",
-    "description": "WalletCenter plugin skeleton for checkin, topup, and balance auto renew.",
+    "version": "1.1.0",
+    "description": "WalletCenter plugin for daily check-in, balance top-up, and official-order auto renew.",
     "author": "Codex",
     "type": "feature",
     "require": {
@@ -13,55 +13,73 @@
             "type": "string",
             "default": "WalletCenter",
             "label": "显示名称",
-            "description": "WalletCenter 在后台与后续前台主题中的统一显示名称。"
+            "description": "WalletCenter 在后台与前台中的统一显示名称。"
         },
         "checkin_enabled": {
             "type": "boolean",
             "default": false,
-            "label": "启用签到骨架",
-            "description": "控制每日签到 API 与记录入口是否对外开放。阶段 6 完成后再正式启用。"
+            "label": "启用每日签到",
+            "description": "控制每日签到入口、领取接口和签到记录是否开放。"
         },
         "checkin_reward_min": {
             "type": "string",
             "default": "100",
             "label": "签到奖励最小值（分）",
-            "description": "阶段 6 将使用该值作为签到随机奖励下限。"
+            "description": "每次签到随机奖励的下限，单位为分。"
         },
         "checkin_reward_max": {
             "type": "string",
             "default": "500",
             "label": "签到奖励最大值（分）",
-            "description": "阶段 6 将使用该值作为签到随机奖励上限。"
+            "description": "每次签到随机奖励的上限，单位为分。"
+        },
+        "checkin_notice": {
+            "type": "string",
+            "default": "每天可签到一次，奖励将立即发放到账户余额。",
+            "label": "签到提示文案",
+            "description": "展示在用户签到入口的说明文字。"
         },
         "topup_enabled": {
             "type": "boolean",
             "default": false,
-            "label": "启用充值骨架",
-            "description": "控制余额充值 API、充值记录入口与充值通知路由是否开放。阶段 7 完成后再正式启用。"
+            "label": "启用余额充值",
+            "description": "控制余额充值入口和下单接口。支付回调在关闭后仍会入账，避免已付款丢失。"
         },
         "topup_min_amount": {
             "type": "string",
             "default": "100",
             "label": "充值最小金额（分）",
-            "description": "阶段 7 将使用该值作为充值金额下限。"
+            "description": "用户自定义充值金额的下限，单位为分。"
         },
         "topup_max_amount": {
             "type": "string",
             "default": "500000",
             "label": "充值最大金额（分）",
-            "description": "阶段 7 将使用该值作为充值金额上限。"
+            "description": "用户自定义充值金额的上限，单位为分。"
+        },
+        "topup_expire_minutes": {
+            "type": "string",
+            "default": "120",
+            "label": "待支付充值超时（分钟）",
+            "description": "超过该时间仍未收到成功回调的充值订单将被标记为过期。"
         },
         "auto_renew_enabled": {
             "type": "boolean",
             "default": false,
-            "label": "启用自动续费骨架",
-            "description": "控制自动续费 API、记录入口与扫描命令是否开放。阶段 8 和阶段 9 完成后再正式启用。"
+            "label": "启用余额自动续费",
+            "description": "控制自动续费入口、设置接口和扫描任务。成功时会创建官方订阅订单并走核心开通。"
         },
         "auto_renew_window_hours": {
             "type": "string",
             "default": "24",
             "label": "续费提前小时数",
-            "description": "阶段 8 将使用该值决定到期前多久尝试自动续费。"
+            "description": "到期前多少小时开始尝试自动续费。"
+        },
+        "auto_renew_scan_limit": {
+            "type": "string",
+            "default": "100",
+            "label": "每轮扫描人数",
+            "description": "计划任务每分钟最多处理的自动续费用户数。"
         }
     }
 }

@@ -19,7 +19,7 @@ class WalletCenterAdminOverviewService
     public function getOverview(): array
     {
         $overview = $this->manifestService->getOverview();
-        $overview['phase'] = 'stage-10-admin-config-records';
+        $overview['phase'] = 'wallet-center';
         $overview['config_sections'] = $this->configService->getGroupedConfigSnapshots();
         $overview['feature_states'] = $this->configService->getFeatureStates();
         $overview['available_payment_channels'] = $this->paymentChannelService->listEnabledChannels();

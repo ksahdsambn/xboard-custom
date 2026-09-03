@@ -2,6 +2,7 @@
 
 namespace Plugin\WalletCenter\Services;
 
+use App\Exceptions\ApiException;
 use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Database\Eloquent\Collection;
@@ -29,11 +30,14 @@ class CheckinService
 
         return [
             'today_claimed' => (bool) $todayRecord,
-            'can_claim' => !$todayRecord && $rewardRange['valid'],
+            'can_claim' => !$todayRecord && $rewardRange['valid'] && !$user->banned,
             'today_record' => $todayRecord,
             'latest_record' => $latestRecord,
             'reward_range' => $rewardRange,
             'server_date' => $this->getClaimDate(),
+            'notice' => $this->getNotice(),
+            'streak_days' => $this->getStreakDays($user->id),
+            'banned' => (bool) $user->banned,
         ];
     }
 
@@ -92,6 +96,10 @@ class CheckinService
                 throw new \RuntimeException('WalletCenter checkin user not found.');
             }
 
+            if ($lockedUser->banned) {
+                throw new ApiException('封禁用户不能参与签到。');
+            }
+
             $existingRecord = $this->findSuccessfulRecordByDate($lockedUser->id, $claimDate, true);
             if ($existingRecord) {
                 return [
@@ -100,6 +108,8 @@ class CheckinService
                     'balance' => (int) ($lockedUser->balance ?? 0),
                     'reward_range' => $rewardRange,
                     'claim_date' => $claimDate,
+                    'notice' => $this->getNotice(),
+                    'streak_days' => $this->getStreakDays($lockedUser->id),
                 ];
             }
 
@@ -108,19 +118,41 @@ class CheckinService
                 : random_int($rewardRange['min'], $rewardRange['max']);
 
             $balanceBefore = (int) ($lockedUser->balance ?? 0);
+
+            try {
+                $record = CheckinLog::query()->create([
+                    'user_id' => $lockedUser->id,
+                    'claim_date' => $claimDate,
+                    'reward_amount' => $rewardAmount,
+                    'status' => 'success',
+                    'meta' => $this->buildMeta($requestMeta, $balanceBefore, $balanceBefore + $rewardAmount),
+                ]);
+            } catch (\Illuminate\Database\QueryException $exception) {
+                if (!str_contains(strtolower($exception->getMessage()), 'unique')
+                    && !str_contains($exception->getMessage(), 'wallet_center_checkin_user_date_unique')) {
+                    throw $exception;
+                }
+
+                $existingRecord = $this->findSuccessfulRecordByDate($lockedUser->id, $claimDate, true);
+
+                return [
+                    'claimed' => false,
+                    'record' => $existingRecord,
+                    'balance' => $balanceBefore,
+                    'reward_range' => $rewardRange,
+                    'claim_date' => $claimDate,
+                    'notice' => $this->getNotice(),
+                    'streak_days' => $this->getStreakDays($lockedUser->id),
+                ];
+            }
+
             if (!$this->userService->addBalance($lockedUser->id, $rewardAmount)) {
                 throw new \RuntimeException('WalletCenter checkin reward credit failed.');
             }
 
             $lockedUser->refresh();
-
-            $record = CheckinLog::query()->create([
-                'user_id' => $lockedUser->id,
-                'claim_date' => $claimDate,
-                'reward_amount' => $rewardAmount,
-                'status' => 'success',
-                'meta' => $this->buildMeta($requestMeta, $balanceBefore, (int) ($lockedUser->balance ?? 0)),
-            ]);
+            $record->meta = $this->buildMeta($requestMeta, $balanceBefore, (int) ($lockedUser->balance ?? 0));
+            $record->save();
 
             return [
                 'claimed' => true,
@@ -129,8 +161,45 @@ class CheckinService
                 'balance' => (int) ($lockedUser->balance ?? 0),
                 'reward_range' => $rewardRange,
                 'claim_date' => $claimDate,
+                'notice' => $this->getNotice(),
+                'streak_days' => $this->getStreakDays($lockedUser->id),
             ];
         }, 3);
+    }
+
+    public function getNotice(): string
+    {
+        $notice = trim((string) ($this->configService->getConfig()['checkin_notice'] ?? ''));
+
+        return $notice !== '' ? $notice : '每天可签到一次，奖励将立即发放到账户余额。';
+    }
+
+    public function getStreakDays(int $userId): int
+    {
+        $dates = CheckinLog::query()
+            ->where('user_id', $userId)
+            ->where('status', 'success')
+            ->orderByDesc('claim_date')
+            ->limit(60)
+            ->pluck('claim_date')
+            ->map(fn ($date) => substr((string) $date, 0, 10))
+            ->unique()
+            ->values();
+
+        $streak = 0;
+        $today = $this->getClaimDate();
+        $cursor = $dates->contains($today)
+            ? Carbon::parse($today)
+            : Carbon::parse($today)->subDay();
+        foreach ($dates as $date) {
+            if ($date !== $cursor->toDateString()) {
+                break;
+            }
+            $streak++;
+            $cursor = $cursor->subDay();
+        }
+
+        return $streak;
     }
 
     public function getRewardRangeSnapshot(): array
@@ -183,7 +252,7 @@ class CheckinService
 
     protected function getClaimDate(): string
     {
-        return Carbon::now()->toDateString();
+        return Carbon::now(config('app.timezone'))->toDateString();
     }
 
     protected function buildMeta(array $requestMeta, int $balanceBefore, int $balanceAfter): array

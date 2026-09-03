@@ -4,7 +4,6 @@ namespace Plugin\BepusdtPayment;
 
 use App\Contracts\PaymentInterface;
 use App\Exceptions\ApiException;
-use App\Jobs\OrderHandleJob;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Services\Plugin\AbstractPlugin;
@@ -62,7 +61,18 @@ class Plugin extends AbstractPlugin implements PaymentInterface
                     $this->intercept(response('verify error', 422));
                 }
 
-                $this->intercept($verify);
+                if (!is_array($verify)) {
+                    $this->intercept($verify);
+                }
+
+                $tradeNo = trim((string) ($verify['trade_no'] ?? ''));
+                $order = $tradeNo !== ''
+                    ? Order::where('trade_no', $tradeNo)->first()
+                    : null;
+
+                if (!$order) {
+                    $this->intercept($verify['custom_result'] ?? 'success');
+                }
             } catch (\App\Services\Plugin\InterceptResponseException $e) {
                 throw $e;
             } catch (\Throwable $e) {
@@ -156,7 +166,7 @@ class Plugin extends AbstractPlugin implements PaymentInterface
             'notify_url' => $notifyUrl,
             'redirect_url' => $returnUrl,
             'fiat' => $this->getFiat(),
-            'name' => $this->getOrderName(),
+            'name' => $this->resolveOrderName($order['product_name'] ?? null),
             'timeout' => $this->resolveTimeoutSeconds(),
         ];
 
@@ -215,16 +225,7 @@ class Plugin extends AbstractPlugin implements PaymentInterface
                 return false;
             }
 
-            if (!is_array($verify)) {
-                return $verify;
-            }
-
-            HookManager::call('payment.notify.verified', $verify);
-            if (!$this->markOrderPaid($verify['trade_no'], $verify['callback_no'])) {
-                return response('handle error', 400);
-            }
-
-            return $verify['custom_result'] ?? 'success';
+            return $verify;
         } catch (ApiException $e) {
             Log::warning('BEpusdt notify rejected', [
                 'uuid' => $this->getConfig('uuid'),
@@ -481,6 +482,13 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         return $orderName !== '' ? $orderName : 'Xboard Subscription Order';
     }
 
+    private function resolveOrderName(mixed $override): string
+    {
+        $orderName = trim((string) $override);
+
+        return $orderName !== '' ? $orderName : $this->getOrderName();
+    }
+
     private function getTradeType(): ?string
     {
         $tradeType = trim((string) $this->getConfig('trade_type'));
@@ -535,49 +543,6 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         }
 
         return (int) round(((float) $value) * 100);
-    }
-
-    private function markOrderPaid(string $tradeNo, string $callbackNo): bool
-    {
-        $order = Order::where('trade_no', $tradeNo)->first();
-        if (!$order) {
-            Log::warning('BEpusdt notify ignored because order does not exist during mark paid', [
-                'trade_no' => $tradeNo,
-                'callback_no' => $callbackNo,
-            ]);
-            return true;
-        }
-
-        if ($order->status !== Order::STATUS_PENDING) {
-            return true;
-        }
-
-        $updated = Order::query()
-            ->where('id', $order->id)
-            ->where('status', Order::STATUS_PENDING)
-            ->update([
-                'status' => Order::STATUS_PROCESSING,
-                'paid_at' => time(),
-                'callback_no' => $callbackNo,
-            ]);
-
-        if (!$updated) {
-            $currentStatus = Order::query()
-                ->where('id', $order->id)
-                ->value('status');
-
-            return $currentStatus !== null && $currentStatus !== Order::STATUS_PENDING;
-        }
-
-        try {
-            OrderHandleJob::dispatchSync($order->trade_no);
-            HookManager::call('payment.notify.success', $order);
-        } catch (\Throwable $e) {
-            Log::error($e);
-            return false;
-        }
-
-        return true;
     }
 
     private function normalizePaymentConfig(Payment $payment): array

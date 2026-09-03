@@ -85,3 +85,35 @@
 - `theme/XboardCustom/assets/wallet-center.js`、`i18n-extra.js`、`umi.js` 再次通过 `node --check`。
 - `scripts/deploy-overlay.sh` 通过真实 Bash 语法检查。
 - `theme/XboardCustom/assets/umi.js.gz` 与 `theme/XboardCustom/assets/umi.js.br` 已确认和 `umi.js` 内容一致。
+
+## 2026-08-23 官方更新任务分支历史分叉修复
+
+### 6. `xboard-official-update` 无法快进更新
+
+- 环境：
+  - 1Panel 官方 Xboard 目录：`/opt/1panel/www/sites/xboard/index`
+  - 自定义更新仓库：`/opt/xboard-custom`
+  - 失败命令：`git pull --ff-only origin compose`
+- 问题描述：
+  - 服务器本地 `compose` 分支与官方远程显示为 `ahead 10, behind 44`，导致 `--ff-only` 拒绝更新。
+  - 本地 HEAD `151d9fa` 与远程 HEAD `0a74968` 的 Git tree ID 均为 `0d06bc2013ecefeed06314b18ffe4cd96a8b7531`，说明两者文件内容完全一致，差异仅来自官方分支改写了提交历史。
+  - 生产仓库中 `.env` 存在本地配置，不能使用 `git reset --hard`。
+- 修复操作：
+  - 先创建备份分支 `backup/compose-before-realign-20260823`，保留修复前的本地 HEAD。
+  - 在确认本地与远程 tree ID 完全相同、`compose.yaml` 无本地修改后，执行 `git reset --keep origin/compose` 对齐分支指针。
+  - 对齐前后校验 `.env` 的 SHA-256，确认生产配置未被改动。
+  - 重新执行 `/opt/1panel/task/shell/xboard-official-update/xboard-official-update.sh`，官方与自定义仓库均成功更新。
+  - 拉取 `ghcr.io/cedar2025/xboard:latest` 后重建并启动 `index-xboard-1`，再同步插件和主题 overlay 并重启服务。
+- 修复结果：
+  - `compose` 分支已与 `origin/compose` 对齐，更新任务不再报 `Not possible to fast-forward`。
+  - 容器状态为 `running`，重启计数为 0，未发生 OOM，运行镜像 ID 为 `sha256:881d24a98a6deed5f3c3edb5a641799df148881275789b8e4f3969feb7f8182c`。
+
+## 2026-08-23 线上验证
+
+- `php artisan --version` 正常：Laravel Framework 12.54.1，PHP 8.2.33，维护模式关闭。
+- Horizon 状态为 `running`，Redis Unix Socket 返回 `PONG`。
+- 数据库迁移状态检查通过，已列出的迁移均为 `Ran`。
+- 本机 HTTP 首页返回 200，公网 HTTPS 首页返回 200。
+- 公开配置 API 连续 5 次请求均返回 200，响应时间约 49–57 ms。
+- Octane、Horizon、Redis、WebSocket 和 Caddy 进程均进入 `RUNNING` 状态。
+- 容器完成启动后的日志未发现 `fatal`、`panic`、`exception`、`error` 或 `critical`。切换期间曾有两条 Redis Socket 尚未就绪的瞬时记录，Redis 启动后未再出现。

@@ -197,7 +197,9 @@
       content.style.backgroundColor = "rgba(15, 23, 42, 0.08)";
       content.style.boxShadow = "inset 0 0 0 1px rgba(15, 23, 42, 0.06)";
     }
-    content.style.transform = "translateX(1px)";
+    content.style.transform = document.body && document.body.classList.contains("xc-rtl")
+      ? "translateX(-1px)"
+      : "translateX(1px)";
     content.style.color = "var(--xc-text)";
   }
 
@@ -399,11 +401,21 @@
         history: "历史记录",
         disabledFeature: "该功能当前未启用。",
         empty: "暂无数据",
-        refreshHint: "如刚完成支付，可点击刷新同步结果。",
+        refreshHint: "支付完成后会自动同步结果，也可手动刷新。",
         topupCreated: "充值订单已创建，即将跳转支付。",
         checkinOk: "签到成功，奖励已入账。",
         renewOk: "自动续费设置已更新。",
-        failed: "请求失败"
+        failed: "请求失败",
+        amountMin: "最小金额",
+        amountMax: "最大金额",
+        fee: "手续费",
+        confirmClaim: "确认领取今日签到奖励？",
+        confirmTopup: "确认创建充值订单并跳转支付？",
+        confirmRenewOn: "确认开启余额自动续费？系统将通过官方订单开通。",
+        confirmRenewOff: "确认关闭自动续费？",
+        polling: "正在同步支付结果…",
+        streak: "连续签到",
+        notice: "说明"
       },
       "en-US": {
         wallet: "Wallet",
@@ -439,11 +451,21 @@
         history: "History",
         disabledFeature: "This feature is currently disabled.",
         empty: "No data",
-        refreshHint: "If payment just finished, refresh to sync the result.",
+        refreshHint: "Payment results sync automatically. You can also refresh manually.",
         topupCreated: "Top-up order created. Redirecting to payment.",
         checkinOk: "Check-in succeeded.",
         renewOk: "Auto renew setting updated.",
-        failed: "Request failed"
+        failed: "Request failed",
+        amountMin: "Minimum",
+        amountMax: "Maximum",
+        fee: "Fee",
+        confirmClaim: "Claim today's check-in reward?",
+        confirmTopup: "Create a top-up order and continue to payment?",
+        confirmRenewOn: "Enable balance auto-renew? Renewal will create an official order.",
+        confirmRenewOff: "Disable auto-renew?",
+        polling: "Syncing payment result…",
+        streak: "Streak",
+        notice: "Note"
       }
     };
     var extra = EXTRA_I18N.wallet || {};
@@ -545,6 +567,21 @@
     };
   }
 
+  function canonicalizeWalletHash() {
+    var parsed = parseHash(location.hash);
+    var shouldRecover = parsed.path === "/wallet"
+      || (parsed.path === "/404" && !!parsed.tradeNo);
+    if (!shouldRecover) return;
+    var tradeNo = parsed.tradeNo;
+    var next = "#/dashboard?xc_wallet=1";
+    var section = parsed.section || (tradeNo ? "topup" : "");
+    if (section) next += "&section=" + encodeURIComponent(section);
+    if (tradeNo) next += "&topup_trade_no=" + encodeURIComponent(tradeNo);
+    if (location.hash !== next) {
+      history.replaceState(null, "", location.pathname + location.search + next);
+    }
+  }
+
   function isAuthPath(path) {
     return path === "/login"
       || path === "/register"
@@ -555,6 +592,8 @@
   }
 
   function shouldShowDock() {
+    var walletConfig = state.comm && state.comm.wallet_center;
+    if (walletConfig && walletConfig.enabled === false) return false;
     return (!!state.token || state.authed === true) && !isAuthPath(state.route.path);
   }
 
@@ -580,7 +619,7 @@
       return { mode: "floating", visible: true, probe: false, floatingAllowed: true };
     }
     if (input.isMobile) {
-      return { mode: "floating", visible: false, probe: true, floatingAllowed: false };
+      return { mode: "floating", visible: true, probe: true, floatingAllowed: true };
     }
     return { mode: "floating", visible: false, probe: !!input.shellReady, floatingAllowed: false };
   }
@@ -675,21 +714,37 @@
     }
   }
 
+  function readStoredToken(raw) {
+    if (!raw) return null;
+    try {
+      var parsed = JSON.parse(raw);
+      var value = parsed && typeof parsed === "object" && parsed.value != null ? parsed.value : parsed;
+      if (typeof value === "string" && value) {
+        return /^Bearer /i.test(value) ? value : "Bearer " + value;
+      }
+      if (parsed && typeof parsed.auth_data === "string") {
+        return /^Bearer /i.test(parsed.auth_data) ? parsed.auth_data : "Bearer " + parsed.auth_data;
+      }
+    } catch (error) {
+      var text = String(raw).trim();
+      var match = text.match(/Bearer\s+[A-Za-z0-9._-]+/i);
+      if (match) return "Bearer " + match[0].replace(/^Bearer\s+/i, "").trim();
+      if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(text)) {
+        return "Bearer " + text;
+      }
+    }
+    return null;
+  }
+
   function token() {
+    var keys = ["VUE_NAIVE_ACCESS_TOKEN", "ACCESS_TOKEN", "auth_data"];
     var stores = [window.localStorage, window.sessionStorage];
     for (var i = 0; i < stores.length; i += 1) {
       var store = stores[i];
       if (!store) continue;
-      for (var j = 0; j < store.length; j += 1) {
-        var raw = store.getItem(store.key(j)) || "";
-        var match = raw.match(/Bearer\s+[A-Za-z0-9._-]+/i);
-        if (match) return "Bearer " + match[0].replace(/^Bearer\s+/i, "").trim();
-        try {
-          var parsed = JSON.parse(raw);
-          if (parsed && typeof parsed.auth_data === "string" && /^Bearer /i.test(parsed.auth_data)) {
-            return parsed.auth_data;
-          }
-        } catch (error) {}
+      for (var k = 0; k < keys.length; k += 1) {
+        var found = readStoredToken(store.getItem(keys[k]));
+        if (found) return found;
       }
     }
     return null;
@@ -772,6 +827,9 @@
     if (dom.overlay) return;
     dom.overlay = document.createElement("div");
     dom.overlay.className = "xc-wallet-overlay";
+    dom.overlay.setAttribute("role", "dialog");
+    dom.overlay.setAttribute("aria-modal", "true");
+    dom.overlay.setAttribute("aria-label", t("title"));
     dom.overlay.addEventListener("click", onClick);
     dom.shell = document.createElement("div");
     dom.shell.className = "xc-wallet-shell";
@@ -826,8 +884,25 @@
     return /disabled/i.test(message) || /未启用|未开启|禁用/.test(message);
   }
 
+  function applyThemeTokens() {
+    var color = (window.settings && window.settings.theme && window.settings.theme.color) || "default";
+    var map = {
+      default: "#16a34a",
+      blue: "#2563eb",
+      black: "#0f172a",
+      darkblue: "#1d4ed8"
+    };
+    document.documentElement.style.setProperty("--xc-accent", map[color] || map.default);
+    document.documentElement.style.setProperty("--xc-accent-soft", (color === "black" ? "rgba(255,255,255,0.12)" : "rgba(22, 163, 74, 0.12)"));
+    if (document.body) {
+      document.body.dataset.xcTheme = color;
+      document.body.classList.toggle("xc-theme-dark", color === "black");
+    }
+  }
+
   function render() {
     ensureDockHost();
+    applyThemeTokens();
     applyLocaleDirection(state.locale);
     renderDock();
     if (state.route.isWallet) {
@@ -871,16 +946,23 @@
       ? '<div class="xc-wallet-stack">' + badge(t("disabledFeature"), "warning") + "</div>"
       : '<div class="xc-wallet-stack">'
         + badge(ck.today_claimed ? t("claimed") : t("claim"), ck.today_claimed ? "success" : "warning")
+        + (ck.notice ? "<p>" + esc(ck.notice) + "</p>" : "")
         + "<p>" + esc(t("range")) + ": " + esc(money((ck.reward_range || {}).min || 0)) + " ~ " + esc(money((ck.reward_range || {}).max || 0)) + "</p>"
+        + (ck.streak_days ? "<p>" + esc(t("streak")) + ": " + esc(String(ck.streak_days)) + "</p>" : "")
         + '<button type="button" data-xc="claim"' + (ck.today_claimed ? " disabled" : "") + ' data-variant="success">' + esc(ck.today_claimed ? t("claimed") : t("claim")) + "</button>"
         + "</div>";
 
+    var range = topMethods.amount_range || {};
     var methods = (topMethods.payment_channels || []).map(function (method, index) {
-      return '<label class="xc-wallet-radio"><div><strong>' + esc(method.name || method.payment || "Payment") + '</strong><span>' + esc(method.payment || "") + '</span></div><input type="radio" name="xc_topup" value="' + esc(String(method.id)) + '"' + (index === 0 ? " checked" : "") + " /></label>";
+      var feeParts = [];
+      if (Number(method.handling_fee_percent)) feeParts.push(Number(method.handling_fee_percent) + "%");
+      if (Number(method.handling_fee_fixed)) feeParts.push(money(method.handling_fee_fixed));
+      var feeText = feeParts.length ? t("fee") + ": " + feeParts.join(" + ") : "";
+      return '<label class="xc-wallet-radio"><div><strong>' + esc(method.name || method.payment || "Payment") + '</strong><span>' + esc(method.payment || "") + (feeText ? " · " + esc(feeText) : "") + '</span></div><input type="radio" name="xc_topup" value="' + esc(String(method.id)) + '"' + (index === 0 ? " checked" : "") + " /></label>";
     }).join("");
     var topupBody = isFeatureDisabled(state.topup.error)
       ? '<div class="xc-wallet-stack">' + badge(t("disabledFeature"), "warning") + "</div>"
-      : '<div class="xc-wallet-form"><input id="xc-topup-amount" class="xc-wallet-input" inputmode="decimal" placeholder="25" /><p>' + esc(t("refreshHint")) + '</p><div class="xc-wallet-radio-list">' + methods + '</div><button type="button" data-xc="topup">' + esc(t("create")) + "</button></div>";
+      : '<div class="xc-wallet-form"><input id="xc-topup-amount" class="xc-wallet-input" inputmode="decimal" placeholder="' + esc((range.min ? (Number(range.min) / 100).toString() : "25")) + '" /><p>' + esc(t("amountMin")) + ": " + esc(money(range.min || 0)) + " · " + esc(t("amountMax")) + ": " + esc(money(range.max || 0)) + "</p><p>" + esc(t("refreshHint")) + '</p><div class="xc-wallet-radio-list">' + methods + '</div><button type="button" data-xc="topup">' + esc(t("create")) + "</button></div>";
 
     var renewBody = isFeatureDisabled(state.renew.error)
       ? '<div class="xc-wallet-stack">' + badge(t("disabledFeature"), "warning") + "</div>"
@@ -892,10 +974,10 @@
         + '<button type="button" data-xc="renew" data-enabled="' + (autoConfig.enabled ? "1" : "0") + '" data-variant="' + (autoConfig.enabled ? "ghost" : "success") + '">' + esc(autoConfig.enabled ? t("disableAction") : t("enableAction")) + "</button>"
         + "</div>";
 
-    var ckItems = ckh.slice(0, 5).map(function (record) {
+    var ckItems = ckh.slice(0, 20).map(function (record) {
       return item(record.claim_date || "--", [t("amount") + ": " + money(record.reward_amount || 0)], badge("success"));
     });
-    var topItems = (((state.topup.history || {}).records) || []).slice(0, 5).map(function (record) {
+    var topItems = (((state.topup.history || {}).records) || []).slice(0, 20).map(function (record) {
       var tone = /paid/i.test(record.status_label || "") ? "success" : /expired|cancelled/i.test(record.status_label || "") ? "danger" : "warning";
       return item(record.trade_no || "--", [t("amount") + ": " + money(record.amount || 0), t("latest") + ": " + time(record.created_at)], badge(record.status_label || "--", tone));
     });
@@ -906,7 +988,7 @@
         badge(state.topup.detail.order.status_label || "--")
       ));
     }
-    var renewItems = (((state.renew.history || {}).records) || []).slice(0, 5).map(function (record) {
+    var renewItems = (((state.renew.history || {}).records) || []).slice(0, 20).map(function (record) {
       var tone = /success/i.test(record.status_label || "") ? "success" : /failed/i.test(record.status_label || "") ? "danger" : "warning";
       return item(record.status_label || "--", [t("amount") + ": " + money(record.amount || 0), t("reason") + ": " + (record.reason_message || record.reason || "--")], badge(record.status_label || "--", tone));
     });
@@ -940,6 +1022,7 @@
   }
 
   async function claim() {
+    if (!window.confirm(t("confirmClaim"))) return;
     try {
       await api("/api/v1/wallet-center/checkin/claim", { method: "POST", body: {} });
       toast(t("checkinOk"), "success");
@@ -953,6 +1036,7 @@
     var amount = amountCents((dom.shell.querySelector("#xc-topup-amount") || {}).value || "");
     var payment = paymentId();
     if (!amount || !payment) return toast(t("failed"), "error");
+    if (!window.confirm(t("confirmTopup"))) return;
     try {
       var res = await api("/api/v1/wallet-center/topup/create", { method: "POST", body: { payment_id: payment, amount: amount } });
       if (res && res.order && res.order.trade_no) sessionStorage.setItem(LAST_TOPUP, res.order.trade_no);
@@ -968,6 +1052,7 @@
   }
 
   async function toggleRenew(current) {
+    if (!window.confirm(current ? t("confirmRenewOff") : t("confirmRenewOn"))) return;
     try {
       await api("/api/v1/wallet-center/auto-renew/config", { method: "POST", body: { enabled: !current } });
       toast(t("renewOk"), "success");
@@ -1005,6 +1090,9 @@
     state.user = base.data;
     clearAuthProbe();
     if (!shouldLoadWallet) {
+      var commOnly = await safe(function () { return api("/api/v1/user/comm/config"); });
+      if (rid !== state.rid) return;
+      if (commOnly.ok) state.comm = commOnly.data;
       state.loading = false;
       return render();
     }
@@ -1013,12 +1101,12 @@
       safe(function () { return api("/api/v1/user/getSubscribe"); }),
       safe(function () { return api("/api/v1/user/comm/config"); }),
       safe(function () { return api("/api/v1/wallet-center/checkin/status"); }),
-      safe(function () { return api("/api/v1/wallet-center/checkin/history?limit=5"); }),
+      safe(function () { return api("/api/v1/wallet-center/checkin/history?limit=20"); }),
       safe(function () { return api("/api/v1/wallet-center/topup/methods"); }),
-      safe(function () { return api("/api/v1/wallet-center/topup/history?limit=5"); }),
+      safe(function () { return api("/api/v1/wallet-center/topup/history?limit=20"); }),
       safe(function () { return tradeNo ? api("/api/v1/wallet-center/topup/detail?trade_no=" + encodeURIComponent(tradeNo)) : Promise.resolve(null); }),
       safe(function () { return api("/api/v1/wallet-center/auto-renew/config"); }),
-      safe(function () { return api("/api/v1/wallet-center/auto-renew/history?limit=5"); })
+      safe(function () { return api("/api/v1/wallet-center/auto-renew/history?limit=20"); })
     ]);
     if (rid !== state.rid) return;
     state.subscribe = all[0].ok ? all[0].data : null;
@@ -1039,15 +1127,29 @@
       history: all[8].ok ? all[8].data : null,
       error: all[7].ok ? (all[8].ok ? null : all[8].error) : all[7].error
     };
-    if (state.topup.detail && state.topup.detail.order && /paid|expired|cancelled/i.test(state.topup.detail.order.status_label || "")) {
+    if (state.topup.detail && state.topup.detail.order && /paid|expired|cancelled|refunded/i.test(state.topup.detail.order.status_label || "")) {
       sessionStorage.removeItem(LAST_TOPUP);
     }
     state.loading = false;
     render();
+    scheduleTopupPoll();
+  }
+
+  var topupPollTimer = 0;
+  function scheduleTopupPoll() {
+    if (topupPollTimer) {
+      clearTimeout(topupPollTimer);
+      topupPollTimer = 0;
+    }
+    var order = state.topup && state.topup.detail && state.topup.detail.order;
+    if (!order || !state.route.isWallet) return;
+    if (/paid|expired|cancelled|refunded/i.test(order.status_label || "")) return;
+    topupPollTimer = setTimeout(function () { load(true); }, 3000);
   }
 
   function sync() {
     state.locale = detectLocale();
+    canonicalizeWalletHash();
     var next = parseHash(location.hash);
     if (next.isWallet && !state.route.isWallet) remember();
     state.route = next;
@@ -1055,6 +1157,8 @@
   }
 
   function init() {
+    canonicalizeWalletHash();
+    state.route = parseHash(location.hash);
     ensureDockHost();
     load(false);
     if (document.body) {

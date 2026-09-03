@@ -2,7 +2,6 @@
 
 namespace Plugin\StripePayment;
 
-use App\Jobs\OrderHandleJob;
 use App\Contracts\PaymentInterface;
 use App\Exceptions\ApiException;
 use App\Models\Order;
@@ -60,7 +59,18 @@ class Plugin extends AbstractPlugin implements PaymentInterface
                     $this->intercept(response('verify error', 422));
                 }
 
-                $this->intercept($verify);
+                if (!is_array($verify)) {
+                    $this->intercept($verify);
+                }
+
+                $tradeNo = trim((string) ($verify['trade_no'] ?? ''));
+                $order = $tradeNo !== ''
+                    ? Order::where('trade_no', $tradeNo)->first()
+                    : null;
+
+                if (!$order) {
+                    $this->intercept($verify['custom_result'] ?? 'success');
+                }
             } catch (\App\Services\Plugin\InterceptResponseException $e) {
                 throw $e;
             } catch (\Throwable $e) {
@@ -137,6 +147,7 @@ class Plugin extends AbstractPlugin implements PaymentInterface
             'user_id' => $userId,
             'return_url' => $returnUrl,
             'notify_url' => $notifyUrl,
+            'product_name' => trim((string) ($order['product_name'] ?? '')),
         ]);
 
         $checkoutUrl = $session['url'] ?? null;
@@ -168,16 +179,7 @@ class Plugin extends AbstractPlugin implements PaymentInterface
                 return false;
             }
 
-            if (!is_array($verify)) {
-                return $verify;
-            }
-
-            HookManager::call('payment.notify.verified', $verify);
-            if (!$this->markOrderPaid($verify['trade_no'], $verify['callback_no'])) {
-                return response('handle error', 400);
-            }
-
-            return $verify['custom_result'] ?? 'success';
+            return $verify;
         } catch (ApiException $e) {
             Log::warning('Stripe notify rejected', [
                 'uuid' => $this->getConfig('uuid'),
@@ -200,8 +202,8 @@ class Plugin extends AbstractPlugin implements PaymentInterface
             'client_reference_id' => $context['trade_no'],
             'line_items[0][quantity]' => 1,
             'line_items[0][price_data][currency]' => strtolower($this->getCurrency()),
-            'line_items[0][price_data][unit_amount]' => $context['total_amount'],
-            'line_items[0][price_data][product_data][name]' => $this->getProductName(),
+            'line_items[0][price_data][unit_amount]' => $this->toStripeUnitAmount($context['total_amount']),
+            'line_items[0][price_data][product_data][name]' => $this->resolveProductName($context['product_name'] ?? null),
             'line_items[0][price_data][product_data][description]' => sprintf('Order %s', $context['trade_no']),
             'metadata[trade_no]' => $context['trade_no'],
             'metadata[user_id]' => (string) $context['user_id'],
@@ -218,11 +220,15 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         $type = (string) ($event['type'] ?? '');
 
         return match ($type) {
-            'checkout.session.completed' => $this->resolveCompletedSession($event),
+            'checkout.session.completed',
+            'checkout.session.async_payment_succeeded' => $this->resolveCompletedSession($event),
             'checkout.session.expired',
             'checkout.session.async_payment_failed',
             'payment_intent.payment_failed',
-            'payment_intent.canceled' => 'success',
+            'payment_intent.canceled',
+            'charge.refunded',
+            'charge.refund.updated',
+            'refund.created' => 'success',
             default => 'success',
         };
     }
@@ -258,7 +264,7 @@ class Plugin extends AbstractPlugin implements PaymentInterface
 
         $expectedAmount = (int) $order->total_amount + (int) ($order->handling_amount ?? 0);
         $sessionAmount = (int) ($session['amount_total'] ?? -1);
-        if ($sessionAmount !== $expectedAmount) {
+        if ($sessionAmount !== $this->toStripeUnitAmount($expectedAmount)) {
             Log::warning('Stripe webhook amount mismatch', [
                 'trade_no' => $tradeNo,
                 'expected_amount' => $expectedAmount,
@@ -412,6 +418,28 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         return $productName !== '' ? $productName : 'Xboard 订阅订单';
     }
 
+    private function resolveProductName(mixed $override): string
+    {
+        $productName = trim((string) $override);
+
+        return $productName !== '' ? $productName : $this->getProductName();
+    }
+
+    private function toStripeUnitAmount(int $amountInCents): int
+    {
+        $currency = $this->getCurrency();
+        $zeroDecimal = [
+            'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+            'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
+        ];
+
+        if (in_array($currency, $zeroDecimal, true)) {
+            return (int) round($amountInCents / 100);
+        }
+
+        return $amountInCents;
+    }
+
     private function getSecretKey(): string
     {
         $secretKey = trim((string) $this->getConfig('secret_key'));
@@ -485,48 +513,6 @@ class Plugin extends AbstractPlugin implements PaymentInterface
         $value = $_SERVER[$serverKey] ?? null;
 
         return is_string($value) ? $value : null;
-    }
-
-    private function markOrderPaid(string $tradeNo, string $callbackNo): bool
-    {
-        $order = Order::where('trade_no', $tradeNo)->first();
-        if (!$order) {
-            Log::warning('Stripe notify ignored because order does not exist during mark paid', [
-                'trade_no' => $tradeNo,
-                'callback_no' => $callbackNo,
-            ]);
-            return true;
-        }
-
-        if ($order->status !== Order::STATUS_PENDING) {
-            return true;
-        }
-
-        $updated = Order::query()
-            ->where('id', $order->id)
-            ->where('status', Order::STATUS_PENDING)
-            ->update([
-                'status' => Order::STATUS_PROCESSING,
-                'paid_at' => time(),
-                'callback_no' => $callbackNo,
-            ]);
-
-        if (!$updated) {
-            $currentStatus = Order::query()
-                ->where('id', $order->id)
-                ->value('status');
-            return $currentStatus !== null && $currentStatus !== Order::STATUS_PENDING;
-        }
-
-        try {
-            OrderHandleJob::dispatchSync($order->trade_no);
-            HookManager::call('payment.notify.success', $order);
-        } catch (\Throwable $e) {
-            Log::error($e);
-            return false;
-        }
-
-        return true;
     }
 
     private function normalizePaymentConfig(Payment $payment): array

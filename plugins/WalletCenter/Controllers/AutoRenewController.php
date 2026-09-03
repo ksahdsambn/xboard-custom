@@ -28,7 +28,7 @@ class AutoRenewController extends BaseController
         return $this->success($this->featurePayload(
             WalletCenterFeature::AUTO_RENEW,
             $this->autoRenewService->getConfigSnapshot($request->user()),
-            'stage-08-auto-renew'
+            'wallet-center'
         ));
     }
 
@@ -51,7 +51,7 @@ class AutoRenewController extends BaseController
             return $this->fail([400, $exception->getMessage()], $this->featurePayload(
                 WalletCenterFeature::AUTO_RENEW,
                 $this->autoRenewService->getConfigSnapshot($request->user()),
-                'stage-08-auto-renew'
+                'wallet-center'
             ));
         } catch (\Throwable $exception) {
             report($exception);
@@ -59,14 +59,14 @@ class AutoRenewController extends BaseController
             return $this->fail([500, 'WalletCenter auto renew update failed.'], $this->featurePayload(
                 WalletCenterFeature::AUTO_RENEW,
                 $this->autoRenewService->getConfigSnapshot($request->user()),
-                'stage-08-auto-renew'
+                'wallet-center'
             ));
         }
 
         return $this->success($this->featurePayload(
             WalletCenterFeature::AUTO_RENEW,
             $result,
-            'stage-08-auto-renew'
+            'wallet-center'
         ));
     }
 
@@ -85,6 +85,6 @@ class AutoRenewController extends BaseController
             'records' => $records,
             'count' => $records->count(),
             'config' => $this->autoRenewService->getConfigSnapshot($request->user()),
-        ], 'stage-08-auto-renew'));
+        ], 'wallet-center'));
     }
 }

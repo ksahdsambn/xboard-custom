@@ -216,6 +216,16 @@
 - 交接资料边界已固定：代码文件职责继续以 `architecture.md` 为索引，阶段 1 至阶段 16 的测试与放行证据继续以各阶段文档和 `progress.md` 为索引；其中阶段 12 与阶段 14 的详细结果保留在 `progress.md`，不存在证据缺口。
 - 最终已知限制与范围外能力仍严格对齐需求边界：不支持 `v2board`、管理员后台多语言、Stripe/BEpusdt 循环扣款，以及自动续费回落到其他支付通道。
 
+## 2026-09-04 官方贴合专项
+
+- 2026-09-04 | `plugins/StripePayment/Plugin.php` | `StripePayment` | 成功支付只返回 `{trade_no, callback_no}`，由核心 `PaymentController` + `OrderService::paid()` 开通；非成功事件才 intercept 200。支持零小数货币与充值商品名覆盖。
+- 2026-09-04 | `plugins/BepusdtPayment/Plugin.php` | `BEpusdtPayment` | 与 Stripe 相同的官方 notify 契约，去掉插件内 `OrderHandleJob` 复制开通。
+- 2026-09-04 | `plugins/WalletCenter/Plugin.php` | `WalletCenter` | 注册 `guest_comm_config` / `user_comm_config`、后台用户钩子，以及优先拦截充值 trade_no 的 `payment.notify.before`。
+- 2026-09-04 | `plugins/WalletCenter/Services/WalletCenterNotificationService.php` | `WalletCenter` | 自动续费成功/失败通知：钩子 + 邮件任务 + TelegramService。
+- 2026-09-04 | `plugins/WalletCenter/Commands/ExpirePendingTopupCommand.php` | `WalletCenter` | 清理超时未回调的待支付充值单。
+- 2026-09-04 | `plugins/WalletCenter/database/migrations/2026_09_04_000004_add_unique_index_to_wallet_center_checkin_logs.php` | `WalletCenter` | 签到 `(user_id, claim_date)` 唯一索引。
+- 2026-09-04 | `plugins/WalletCenter/Services/AutoRenewService.php` | `WalletCenter` | 自动续费改为 `OrderService::createFromRequest` + `paid()`，补到期挽回与失败通知。
+
 ## 2026-03-10 新增文件专项复核补充
 
 ### 职责修正

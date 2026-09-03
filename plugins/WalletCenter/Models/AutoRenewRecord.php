@@ -56,18 +56,19 @@ class AutoRenewRecord extends Model
     public function getReasonMessageAttribute(): ?string
     {
         return match ($this->reason) {
-            'user_not_found' => 'WalletCenter auto renew user does not exist.',
-            'plan_not_found' => 'WalletCenter auto renew requires an active subscription plan.',
-            'subscription_not_active' => 'WalletCenter auto renew is only available for active subscriptions.',
-            'onetime_subscription_not_supported' => 'WalletCenter auto renew does not support one-time subscriptions.',
-            'plan_not_renewable' => 'WalletCenter auto renew requires a renewable subscription plan.',
-            'period_not_resolved' => 'WalletCenter auto renew could not resolve the current subscription period.',
-            'period_price_not_available' => 'WalletCenter auto renew could not resolve the current renewal amount.',
-            'pending_order_exists' => 'WalletCenter auto renew skipped because a core order is still pending.',
-            'insufficient_balance' => 'WalletCenter auto renew failed because the balance is insufficient.',
-            'runtime_error' => 'WalletCenter auto renew failed because of a runtime error.',
-            'disabled_by_user' => 'WalletCenter auto renew has been disabled.',
-            'renewed' => 'WalletCenter auto renew completed successfully.',
+            'user_not_found' => '自动续费用户不存在。',
+            'user_banned' => '账户已被封禁，无法自动续费。',
+            'plan_not_found' => '自动续费需要有效的订阅套餐。',
+            'subscription_not_active' => '自动续费仅适用于有效订阅。',
+            'onetime_subscription_not_supported' => '一次性订阅不支持自动续费。',
+            'plan_not_renewable' => '当前套餐不允许续费。',
+            'period_not_resolved' => '无法解析当前订阅周期。',
+            'period_price_not_available' => '无法解析当前续费金额。',
+            'pending_order_exists' => '存在未完成的核心订单，已跳过自动续费。',
+            'insufficient_balance' => '余额不足，自动续费未执行。',
+            'runtime_error' => '自动续费执行出错。',
+            'disabled_by_user' => '已关闭自动续费。',
+            'renewed' => '自动续费已通过官方订单开通完成。',
             default => null,
         };
     }

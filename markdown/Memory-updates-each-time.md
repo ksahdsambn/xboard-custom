@@ -19,6 +19,26 @@
 
 ## 变更记录
 
+### 2026-09-04 官方贴合专项修复
+
+- 日期：2026-09-04
+- 变更类型：支付回调契约、自动续费开通路径、充值回跳、前台钱包入口、签到幂等
+- 涉及文件：
+  - `plugins/StripePayment/Plugin.php`
+  - `plugins/BepusdtPayment/Plugin.php`
+  - `plugins/WalletCenter/Plugin.php`
+  - `plugins/WalletCenter/Services/*`
+  - `plugins/WalletCenter/Commands/ExpirePendingTopupCommand.php`
+  - `theme/XboardCustom/assets/wallet-center.js`
+  - `theme/XboardCustom/assets/wallet-center.css`
+  - `theme/XboardCustom/assets/i18n-extra.js`
+- 变更原因：审查确认自定义层可升级但未完美贴合官方支付开通、钱包回跳和前台入口。
+- 对部署/升级/回滚的影响：
+  - 仍只覆盖 `plugins/` 与 `storage/theme/XboardCustom`，官方核心不改。
+  - 部署后需执行 WalletCenter 新迁移（签到唯一索引）。
+  - 自动续费成功会写入核心 `v2_order`，与旧“只改用户字段”行为不兼容回滚到旧语义。
+  - 未改 `umi.js`，不必重建 `.gz/.br`。
+
 ### 2026-03-10 仓库与部署流程统一整理
 
 #### 1. 代码托管方式统一为 overlay 模式

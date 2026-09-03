@@ -32,7 +32,7 @@ class AdminController extends BaseController
     public function config()
     {
         return $this->success([
-            'phase' => 'stage-10-admin-config-records',
+            'phase' => 'wallet-center',
             'plugin_enabled' => $this->configService->isPluginEnabled(),
             'feature_states' => $this->configService->getFeatureStates(),
             'config_sections' => $this->configService->getGroupedConfigSnapshots(),
@@ -48,7 +48,7 @@ class AdminController extends BaseController
         $this->configService->updateConfig($payload['config']);
 
         return $this->success([
-            'phase' => 'stage-10-admin-config-records',
+            'phase' => 'wallet-center',
             'plugin_enabled' => $this->configService->isPluginEnabled(),
             'feature_states' => $this->configService->getFeatureStates(),
             'config_sections' => $this->configService->getGroupedConfigSnapshots(),
@@ -69,7 +69,7 @@ class AdminController extends BaseController
             'summary' => $this->checkinService->getAdminSummary(),
             'reward_range' => $this->checkinService->getRewardRangeSnapshot(),
             'server_date' => now()->toDateString(),
-        ], 'stage-06-checkin'));
+        ], 'wallet-center'));
     }
 
     public function topupOrders(Request $request)
@@ -86,7 +86,7 @@ class AdminController extends BaseController
             'summary' => $this->topupService->getAdminSummary(),
             'amount_range' => $this->topupService->getAmountRangeSnapshot(),
             'payment_channels' => $this->topupService->listAvailableChannels(),
-        ], 'stage-07-topup'));
+        ], 'wallet-center'));
     }
 
     public function autoRenewRecords(Request $request)
@@ -102,6 +102,6 @@ class AdminController extends BaseController
             'count' => $records->count(),
             'summary' => $this->autoRenewService->getAdminSummary(),
             'renew_window_hours' => $this->autoRenewService->getWindowHours(),
-        ], 'stage-08-auto-renew'));
+        ], 'wallet-center'));
     }
 }

@@ -22,10 +22,10 @@ abstract class BaseController extends Controller
             return null;
         }
 
-        return $this->fail([403, sprintf('WalletCenter %s feature is disabled.', $this->manifestService->getFeatureLabel($feature))]);
+        return $this->fail([403, sprintf('%s功能当前未启用。', $this->manifestService->getFeatureLabel($feature))]);
     }
 
-    protected function featurePayload(string $feature, array $extra = [], string $phase = 'stage-05-skeleton'): array
+    protected function featurePayload(string $feature, array $extra = [], string $phase = 'wallet-center'): array
     {
         return array_merge([
             'phase' => $phase,

@@ -30,7 +30,7 @@ class AdminOverviewService
         ];
 
         return [
-            'phase' => 'stage-10-admin-config-records',
+            'phase' => 'stripe-payment',
             'plugin_code' => self::PLUGIN_CODE,
             'plugin_enabled' => $this->isPluginEnabled(),
             'payment_method' => self::PAYMENT_METHOD,

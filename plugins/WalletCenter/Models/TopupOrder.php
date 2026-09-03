@@ -14,6 +14,7 @@ class TopupOrder extends Model
     public const STATUS_PAID = 2;
     public const STATUS_CANCELLED = 3;
     public const STATUS_EXPIRED = 4;
+    public const STATUS_REFUNDED = 5;
 
     public static array $statusMap = [
         self::STATUS_PENDING => 'pending',
@@ -21,6 +22,7 @@ class TopupOrder extends Model
         self::STATUS_PAID => 'paid',
         self::STATUS_CANCELLED => 'cancelled',
         self::STATUS_EXPIRED => 'expired',
+        self::STATUS_REFUNDED => 'refunded',
     ];
 
     protected $table = 'wallet_center_topup_orders';
@@ -67,6 +69,7 @@ class TopupOrder extends Model
         return match ((int) ($this->attributes['status'] ?? self::STATUS_PENDING)) {
             self::STATUS_CANCELLED => 'gateway_cancelled',
             self::STATUS_EXPIRED => 'gateway_expired',
+            self::STATUS_REFUNDED => 'gateway_refunded',
             default => null,
         };
     }
@@ -79,8 +82,9 @@ class TopupOrder extends Model
         }
 
         return match ($this->failure_reason) {
-            'gateway_cancelled' => 'WalletCenter topup payment was cancelled.',
-            'gateway_expired' => 'WalletCenter topup payment expired.',
+            'gateway_cancelled' => '充值支付已取消。',
+            'gateway_expired' => '充值支付已超时。',
+            'gateway_refunded' => '充值已退款并回滚余额。',
             default => null,
         };
     }

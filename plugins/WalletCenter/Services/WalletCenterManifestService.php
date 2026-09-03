@@ -20,12 +20,13 @@ class WalletCenterManifestService
 
         return [
             'plugin_code' => WalletCenterFeature::PLUGIN_CODE,
-            'phase' => 'stage-05-skeleton',
+            'phase' => 'wallet-center',
             'plugin_enabled' => $this->configService->isPluginEnabled(),
             'boundaries' => [
                 'WalletCenter 只承载签到、充值、自动续费三类钱包业务，不实现新的支付网关。',
-                'WalletCenter 使用独立数据表记录充值与自动续费，不复用核心 v2_order。',
-                'WalletCenter 只读取已启用支付通道，不接管普通订阅支付回调。',
+                '余额充值使用独立表 wallet_center_topup_orders，不混入核心订阅订单。',
+                '自动续费成功时创建官方 v2_order 并走 OrderService::paid()。',
+                'WalletCenter 复用当前已启用支付通道，订阅回调仍由核心 PaymentController 处理。',
             ],
             'tables' => [
                 'wallet_center_checkin_logs',

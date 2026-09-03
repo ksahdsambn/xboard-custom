@@ -21,6 +21,7 @@ final class WalletCenterFeature
                     'checkin_enabled',
                     'checkin_reward_min',
                     'checkin_reward_max',
+                    'checkin_notice',
                 ],
                 'frontend_entries' => [
                     'status' => self::ROUTE_PREFIX . '/checkin/status',
@@ -45,6 +46,7 @@ final class WalletCenterFeature
                     'topup_enabled',
                     'topup_min_amount',
                     'topup_max_amount',
+                    'topup_expire_minutes',
                 ],
                 'frontend_entries' => [
                     'methods' => self::ROUTE_PREFIX . '/topup/methods',
@@ -70,6 +72,7 @@ final class WalletCenterFeature
                 'config_entries' => [
                     'auto_renew_enabled',
                     'auto_renew_window_hours',
+                    'auto_renew_scan_limit',
                 ],
                 'frontend_entries' => [
                     'config' => self::ROUTE_PREFIX . '/auto-renew/config',

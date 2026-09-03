@@ -17,6 +17,10 @@ body.xc-wallet-open {
   overflow: hidden;
 }
 
+.xc-wallet-dock--floating[hidden] {
+  display: none !important;
+}
+
 .xc-wallet-dock--floating {
   position: fixed;
   right: 24px;
@@ -35,6 +39,11 @@ body.xc-wallet-open {
 
 body.xc-rtl .xc-wallet-dock--floating {
   left: 24px;
+  right: auto;
+}
+
+body.xc-rtl .xc-wallet-toast-stack {
+  left: 18px;
   right: auto;
 }
 
@@ -92,6 +101,35 @@ body.xc-rtl .xc-wallet-dock--floating {
   color: var(--xc-text);
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
   transform: translateX(1px);
+}
+
+body.xc-rtl .xc-wallet-dock--sidebar .xc-wallet-dock__item:hover .n-menu-item-content,
+body.xc-rtl .xc-wallet-dock--sidebar .n-menu-item-content:hover,
+body.xc-rtl .xc-wallet-dock--sidebar .n-menu-item-content:focus-visible {
+  transform: translateX(-1px);
+}
+
+body.xc-theme-dark .xc-wallet-overlay {
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
+}
+
+body.xc-theme-dark .xc-wallet-card,
+body.xc-theme-dark .xc-wallet-metric,
+body.xc-theme-dark .xc-wallet-radio,
+body.xc-theme-dark .xc-wallet-list-item,
+body.xc-theme-dark .xc-wallet-empty,
+body.xc-theme-dark .xc-wallet-input {
+  background: rgba(15, 23, 42, 0.88);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+body.xc-theme-dark .xc-wallet-title h1,
+body.xc-theme-dark .xc-wallet-card h2,
+body.xc-theme-dark .xc-wallet-metric strong {
+  color: #f8fafc;
 }
 
 .xc-wallet-dock--sidebar .n-menu-item-content--selected:hover,
@@ -475,6 +513,10 @@ body.xc-rtl .xc-wallet-dock--floating {
     display: none !important;
   }
 
+  .xc-wallet-dock--floating {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
   .xc-wallet-shell {
     width: min(100% - 24px, 100%);
     margin: 16px auto 96px;
@@ -501,7 +543,8 @@ body.xc-rtl .xc-wallet-dock--floating {
     grid-template-columns: 1fr;
   }
 
-  .xc-wallet-dock--floating {
+  .xc-wallet-dock--floating,
+  body.xc-rtl .xc-wallet-dock--floating {
     left: 12px;
     right: 12px;
     bottom: 12px;

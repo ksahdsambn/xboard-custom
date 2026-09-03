@@ -21,15 +21,19 @@ class TopupGatewayService
 
     public function supportedMethods(): array
     {
-        return [
-            'Stripe',
-            'BEpusdt',
-        ];
+        $this->pluginManager->initializeEnabledPlugins();
+
+        return array_keys((new PaymentService('temp'))->getAvailablePaymentMethods());
     }
 
     public function supportsMethod(?string $method): bool
     {
-        return in_array((string) $method, $this->supportedMethods(), true);
+        $method = (string) $method;
+        if ($method === '') {
+            return false;
+        }
+
+        return in_array($method, $this->supportedMethods(), true);
     }
 
     public function createPayment(Payment $payment, TopupOrder $order, ?string $returnUrl = null): array
@@ -39,6 +43,7 @@ class TopupGatewayService
         }
 
         $plugin = $this->resolvePaymentPlugin($payment);
+        $appName = (string) admin_setting('app_name', 'Xboard');
 
         return $plugin->pay([
             'notify_url' => $this->buildNotifyUrl($payment),
@@ -47,6 +52,7 @@ class TopupGatewayService
             'total_amount' => (int) $order->amount + (int) $order->handling_amount,
             'user_id' => $order->user_id,
             'stripe_token' => null,
+            'product_name' => $appName . ' 余额充值',
         ]);
     }
 
@@ -55,7 +61,7 @@ class TopupGatewayService
         return match ((string) $payment->payment) {
             'Stripe' => $this->handleStripeNotify($payment, $request),
             'BEpusdt' => $this->handleBepusdtNotify($payment, $request),
-            default => throw new ApiException('WalletCenter topup payment method is not supported'),
+            default => $this->handleGenericNotify($payment, $request),
         };
     }
 
@@ -159,11 +165,14 @@ class TopupGatewayService
         $type = (string) ($event['type'] ?? '');
 
         return match ($type) {
-            'checkout.session.completed' => $this->resolveStripeCompleted($payment, $event),
+            'checkout.session.completed',
+            'checkout.session.async_payment_succeeded' => $this->resolveStripeCompleted($payment, $event),
             'checkout.session.expired' => $this->resolveStripeState($event, TopupOrder::STATUS_EXPIRED),
             'checkout.session.async_payment_failed',
             'payment_intent.payment_failed',
             'payment_intent.canceled' => $this->resolveStripeState($event, TopupOrder::STATUS_CANCELLED),
+            'charge.refunded',
+            'refund.created' => $this->resolveStripeRefund($event),
             default => [
                 'response' => 'success',
                 'status' => null,
@@ -224,7 +233,11 @@ class TopupGatewayService
 
         $expectedAmount = (int) $order->amount + (int) $order->handling_amount;
         $amountTotal = (int) ($session['amount_total'] ?? -1);
-        if ($amountTotal !== $expectedAmount) {
+        $expectedStripeAmount = $this->toStripeUnitAmount(
+            $expectedAmount,
+            strtoupper(trim((string) ($payment->config['currency'] ?? admin_setting('currency', 'USD'))))
+        );
+        if ($amountTotal !== $expectedStripeAmount) {
             return [
                 'response' => response('amount mismatch', 400),
                 'status' => null,
@@ -234,7 +247,7 @@ class TopupGatewayService
                     'gateway' => 'Stripe',
                     'event_id' => $event['id'] ?? null,
                     'event_type' => $event['type'] ?? null,
-                    'expected_amount' => $expectedAmount,
+                    'expected_amount' => $expectedStripeAmount,
                     'actual_amount' => $amountTotal,
                 ],
             ];
@@ -300,9 +313,125 @@ class TopupGatewayService
 
     protected function extractStripeTradeNo(array $payload): ?string
     {
-        $tradeNo = $payload['metadata']['trade_no'] ?? $payload['client_reference_id'] ?? null;
+        $tradeNo = $payload['metadata']['trade_no']
+            ?? $payload['client_reference_id']
+            ?? $payload['payment_intent']['metadata']['trade_no']
+            ?? null;
 
         return is_string($tradeNo) && $tradeNo !== '' ? $tradeNo : null;
+    }
+
+    protected function resolveStripeRefund(array $event): array
+    {
+        $object = $event['data']['object'] ?? null;
+        $tradeNo = is_array($object) ? $this->extractStripeTradeNo($object) : null;
+        $callbackNo = (string) ($event['id'] ?? $object['id'] ?? '');
+
+        return [
+            'response' => 'success',
+            'status' => TopupOrder::STATUS_REFUNDED,
+            'trade_no' => $tradeNo,
+            'callback_no' => $callbackNo !== '' ? $callbackNo : null,
+            'meta' => [
+                'gateway' => 'Stripe',
+                'event_id' => $event['id'] ?? null,
+                'event_type' => $event['type'] ?? null,
+                'refunded' => true,
+            ],
+        ];
+    }
+
+    protected function toStripeUnitAmount(int $amountInCents, string $currency): int
+    {
+        $zeroDecimal = [
+            'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA',
+            'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
+        ];
+
+        if (in_array(strtoupper($currency), $zeroDecimal, true)) {
+            return (int) round($amountInCents / 100);
+        }
+
+        return $amountInCents;
+    }
+
+    protected function handleGenericNotify(Payment $payment, Request $request): array
+    {
+        $plugin = $this->resolvePaymentPlugin($payment);
+        $params = $request->all();
+        if ($params === []) {
+            $json = $request->json()->all();
+            $params = is_array($json) ? $json : [];
+        }
+
+        try {
+            $verify = $plugin->notify($params);
+        } catch (ApiException $exception) {
+            return [
+                'response' => response($exception->getMessage(), 400),
+                'status' => null,
+                'trade_no' => null,
+                'callback_no' => null,
+                'meta' => [
+                    'gateway' => $payment->payment,
+                    'error' => $exception->getMessage(),
+                ],
+            ];
+        } catch (\Throwable $exception) {
+            if (!str_contains($exception::class, 'InterceptResponseException')) {
+                throw $exception;
+            }
+
+            return [
+                'response' => 'success',
+                'status' => null,
+                'trade_no' => null,
+                'callback_no' => null,
+                'meta' => [
+                    'gateway' => $payment->payment,
+                    'intercepted' => true,
+                ],
+            ];
+        }
+
+        if ($verify === false) {
+            return $this->failureResponse('verify error');
+        }
+
+        if ($verify instanceof \Symfony\Component\HttpFoundation\Response) {
+            return [
+                'response' => $verify,
+                'status' => null,
+                'trade_no' => null,
+                'callback_no' => null,
+                'meta' => [
+                    'gateway' => $payment->payment,
+                ],
+            ];
+        }
+
+        if (!is_array($verify) || empty($verify['trade_no'])) {
+            return [
+                'response' => is_string($verify) ? $verify : 'success',
+                'status' => null,
+                'trade_no' => null,
+                'callback_no' => null,
+                'meta' => [
+                    'gateway' => $payment->payment,
+                    'ignored' => true,
+                ],
+            ];
+        }
+
+        return [
+            'response' => $verify['custom_result'] ?? 'success',
+            'status' => TopupOrder::STATUS_PAID,
+            'trade_no' => (string) $verify['trade_no'],
+            'callback_no' => isset($verify['callback_no']) ? (string) $verify['callback_no'] : null,
+            'meta' => [
+                'gateway' => $payment->payment,
+            ],
+        ];
     }
 
     protected function verifyStripeWebhook(string $payload, string $signatureHeader, string $secret, int $tolerance): array
@@ -588,7 +717,7 @@ class TopupGatewayService
 
     protected function buildDefaultReturnUrl(TopupOrder $order): string
     {
-        return $this->resolveSafeBaseUrl() . '/#/wallet?topup_trade_no=' . $order->trade_no;
+        return $this->resolveSafeBaseUrl() . '/#/dashboard?xc_wallet=1&section=topup&topup_trade_no=' . rawurlencode((string) $order->trade_no);
     }
 
     protected function resolveSafeBaseUrl(): string

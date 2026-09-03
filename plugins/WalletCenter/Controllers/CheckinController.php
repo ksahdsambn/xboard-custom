@@ -27,7 +27,7 @@ class CheckinController extends BaseController
         return $this->success($this->featurePayload(
             WalletCenterFeature::CHECKIN,
             $this->checkinService->getStatusSnapshot($request->user()),
-            'stage-06-checkin'
+            'wallet-center'
         ));
     }
 
@@ -42,11 +42,9 @@ class CheckinController extends BaseController
                 'request_ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
-        } catch (\Throwable $exception) {
-            report($exception);
-
+        } catch (\App\Exceptions\ApiException $exception) {
             return $this->fail(
-                [500, 'WalletCenter checkin reward credit failed.'],
+                [400, $exception->getMessage()],
                 $this->featurePayload(
                     WalletCenterFeature::CHECKIN,
                     [
@@ -54,15 +52,30 @@ class CheckinController extends BaseController
                         'server_date' => now()->toDateString(),
                         'reward_range' => $this->checkinService->getRewardRangeSnapshot(),
                     ],
-                    'stage-06-checkin'
+                    'wallet-center'
+                )
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return $this->fail(
+                [500, '签到奖励入账失败。'],
+                $this->featurePayload(
+                    WalletCenterFeature::CHECKIN,
+                    [
+                        'claimed' => false,
+                        'server_date' => now()->toDateString(),
+                        'reward_range' => $this->checkinService->getRewardRangeSnapshot(),
+                    ],
+                    'wallet-center'
                 )
             );
         }
 
-        $payload = $this->featurePayload(WalletCenterFeature::CHECKIN, $result, 'stage-06-checkin');
+        $payload = $this->featurePayload(WalletCenterFeature::CHECKIN, $result, 'wallet-center');
 
         if (!$result['claimed']) {
-            return $this->fail([409, 'Already checked in today.'], $payload);
+            return $this->fail([409, '今日已签到。'], $payload);
         }
 
         return $this->success($payload);
@@ -84,6 +97,6 @@ class CheckinController extends BaseController
             'count' => $records->count(),
             'reward_range' => $this->checkinService->getRewardRangeSnapshot(),
             'server_date' => now()->toDateString(),
-        ], 'stage-06-checkin'));
+        ], 'wallet-center'));
     }
 }
