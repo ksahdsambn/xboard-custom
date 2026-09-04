@@ -5,12 +5,23 @@ param(
 $ErrorActionPreference = 'Stop'
 $commit = '4f48e61a2cbc6db5338872b6bdb45ef954ec1256'
 $image = 'ghcr.io/cedar2025/xboard@sha256:7edd660fd3dd686370dd0e663cb278b64be0c1403549348a381710b27f840bc5'
-$OfficialRepo = (Resolve-Path -LiteralPath $OfficialRepo).Path
+$OfficialRepo = [IO.Path]::GetFullPath($OfficialRepo)
 $OutputPath = [IO.Path]::GetFullPath($OutputPath)
+$customRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+if ($OutputPath -notmatch '\.json$' -or $OutputPath.StartsWith($OfficialRepo + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $OutputPath.StartsWith($customRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Output must be a JSON report outside official and custom source trees.' }
+$outputAncestor = $OutputPath
+while ($outputAncestor) {
+    if ((Test-Path -LiteralPath $outputAncestor) -and ((Get-Item -LiteralPath $outputAncestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Output must not traverse a symbolic link or reparse point.' }
+    $outputAncestor = Split-Path -Parent $outputAncestor
+}
+# Invalidate an old success before setup; even cleanup/setup exceptions cannot leave it valid.
+New-Item -ItemType Directory -Force -Path (Split-Path $OutputPath -Parent) | Out-Null
+[IO.File]::WriteAllText($OutputPath, "{`"taskId`":`"TASK-005`",`"status`":`"失败`",`"tests`":[]}`n", [Text.UTF8Encoding]::new($false))
 $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $temporary = Join-Path $temporaryRoot ('xboard-task005-' + [guid]::NewGuid().ToString('N'))
 $container = 'xboard-task005-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
 $created = $false
+$createAttempted = $false
 $result = [pscustomobject]@{ schemaVersion = 1; taskId = 'TASK-005'; evidenceClass = 'isolated-upstream-runtime'; sourceCommit = $commit; generatedAt = (Get-Date).ToString('o'); status = '失败'; tests = @() }
 function Invoke-Native([string]$Program, [string[]]$Arguments) {
     $output = & $Program @Arguments 2>&1
@@ -21,12 +32,14 @@ function Add-Check([string]$Name, [bool]$Passed) {
     $result.tests += [pscustomobject]@{ name = $Name; passed = $Passed; details = @{} }
 }
 try {
+    $OfficialRepo = (Resolve-Path -LiteralPath $OfficialRepo).Path
     $before = Invoke-Native git @('-C', $OfficialRepo, 'status', '--porcelain')
     if ($before) { throw 'Official worktree must be clean; no files were changed.' }
     $head = Invoke-Native git @('-C', $OfficialRepo, 'rev-parse', 'HEAD')
     New-Item -ItemType Directory -Path $temporary | Out-Null
     $archive = Join-Path $temporary 'source.tar'
-    Invoke-Native git @('-C', $OfficialRepo, 'archive', '--format=tar', "--output=$archive", $commit) | Out-Null
+    # Archive bytes must match the frozen blobs on Windows and Linux alike.
+    Invoke-Native git @('-C', $OfficialRepo, '-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'archive', '--format=tar', "--output=$archive", $commit) | Out-Null
     $sourceDirectory = Join-Path $temporary 'source'
     New-Item -ItemType Directory -Path $sourceDirectory | Out-Null
     Invoke-Native tar @('-xf', $archive, '-C', $sourceDirectory) | Out-Null
@@ -49,6 +62,7 @@ try {
     $fixtureHashes = @(Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File | Sort-Object FullName | ForEach-Object {
         [ordered]@{ path = [IO.Path]::GetRelativePath($PSScriptRoot, $_.FullName).Replace('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
     })
+    $createAttempted = $true
     Invoke-Native docker @('run', '-d', '--name', $container, '--label', 'xboard.task=TASK-005', $image, 'sleep', 'infinity') | Out-Null
     $created = $true
     Invoke-Native docker @('cp', $archive, "${container}:/tmp/source.tar") | Out-Null
@@ -74,6 +88,7 @@ try {
     Add-Check 'audited_official_files_unmodified_in_runtime' $hashesMatch
     Add-Check 'official_checkout_unchanged' ((Invoke-Native git @('-C', $OfficialRepo, 'status', '--porcelain')) -eq '' -and (Invoke-Native git @('-C', $OfficialRepo, 'rev-parse', 'HEAD')) -eq $head)
     $result | Add-Member -NotePropertyName provenance -NotePropertyValue ([ordered]@{
+        runId = $container
         image = $image; sourceArchiveSha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
         sourceFiles = $sourceHashes; fixtureFiles = $fixtureHashes
         composerManifestLockWarning = ($composerOutput -match 'lock file is not up to date')
@@ -84,7 +99,7 @@ try {
     throw
 } finally {
     $cleaned = $true
-    if ($created) {
+    if ($created -or ($createAttempted -and (Invoke-Native docker @('ps', '-aq', '--filter', "name=^/$container$")))) {
         $identity = (Invoke-Native docker @('inspect', $container) | ConvertFrom-Json)[0]
         if ($identity.Config.Labels.'xboard.task' -ne 'TASK-005') { throw 'Refusing to remove unowned container' }
         Invoke-Native docker @('rm', '-f', $container) | Out-Null
@@ -98,7 +113,7 @@ try {
     }
     if ($null -ne $result) {
         Add-Check 'temporary_container_and_source_removed' $cleaned
-        $result.status = if (@($result.tests | Where-Object { $_.passed -ne $true }).Count -eq 0) { '通过' } else { '失败' }
+        $result.status = if (@($result.tests).Count -gt 0 -and @($result.tests | Where-Object { $_.passed -isnot [bool] -or $_.passed -ne $true }).Count -eq 0) { '通过' } else { '失败' }
         New-Item -ItemType Directory -Force -Path (Split-Path $OutputPath -Parent) | Out-Null
         [IO.File]::WriteAllText($OutputPath, (($result | ConvertTo-Json -Depth 12) -replace "`r`n", "`n") + "`n", [Text.UTF8Encoding]::new($false))
     }

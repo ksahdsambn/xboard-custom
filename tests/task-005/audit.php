@@ -48,7 +48,8 @@ try {
     $dependencyErrors = [];
     foreach ($lock['packages'] as $package) {
         if (!\Composer\InstalledVersions::isInstalled($package['name']) ||
-            \Composer\InstalledVersions::getPrettyVersion($package['name']) !== $package['version']) {
+            \Composer\InstalledVersions::getPrettyVersion($package['name']) !== $package['version'] ||
+            \Composer\InstalledVersions::getReference($package['name']) !== ($package['source']['reference'] ?? $package['dist']['reference'] ?? null)) {
             $dependencyErrors[] = $package['name'];
         }
     }

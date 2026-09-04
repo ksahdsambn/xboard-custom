@@ -285,3 +285,8 @@
 这些测试不属于 `plugins/**` 部署源；禁止将其发布为MobileApp业务插件。需求2.0.1与计划1.2.0的两级资产变更继续由 `markdown/mobile/android-app-requirements.md` 与 `android-app-implementation-plan.md` 权威维护。
 
 - TASK-002再审查（GPT-5 / Codex）：`.gitattributes`进一步为三份`markdown/mobile/*-requirements.md`/Android实施计划权威镜像强制LF，防止Windows检出改变基线SHA-256。
+
+- TASK-005再审查（GPT-5 / Codex）：`tests/task-005-runner-review.ps1`在临时目录复制运行器，测试旧成功废止与官方/定制/非JSON输出保护，输出4项机器结果。
+- `tests/task-005/run.ps1`再审查增加预先失败报告、源码与重解析输出保护、部分创建失败清理和独立runId；`tests/task-005/audit.php`进一步比较Composer依赖源码引用。
+
+- `tests/task-005/run.ps1`：另固定单次Git archive换行配置，使32份运行源码哈希与冻结Git blob字节一致，消除宿主平台配置差异；不修改全局/官方Git配置。

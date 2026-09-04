@@ -19,3 +19,11 @@ HTTP 状态由完整 Laravel HTTP Kernel 产生，不是自定义伪响应。
 插件使用独立 `task005_probe` 表、独立路由/命令，只在空测试数据库创建虚构用户和节点。
 审查也测试升级、停用和卸载；复核必须使用新的容器和数据库，不依赖上轮状态。
 上游风险断言通过意味着“该风险已被复现”，不表示风险已经在上游修复。替代方案见 `markdown/mobile/task-005-xboard-adaptation.md`。
+
+## 再审查保护
+
+执行器拒绝将输出写入官方或定制源码目录、非JSON文件或重解析路径；开始时即使旧成功报告失效，初始化/清理失败不会遗留可放行的旧成功。每轮具有独立runId，依赖同时核对锁定版本和源码引用。
+
+源码导出显式使用单次命令配置 `core.autocrlf=false`、`core.eol=lf`，使 Windows/Linux 的归档源码哈希均与冻结 Git blob 一致；不修改本机全局配置或官方仓库配置。
+
+`pwsh -NoProfile -File tests/task-005-runner-review.ps1 -OutputPath ../xboard-mobile/evidence/TASK-005/runner-review-results.json` 只在临时副本验证初始化失败、官方/定制源码保护和输出扩展名，不启动Docker或修改实际官方仓库。
