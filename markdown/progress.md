@@ -682,3 +682,10 @@
 - TASK-005测试结果：修正测试夹具和执行脚本后，两轮全新容器各47/47，证据及负向注入复核两轮各17/17通过。SQLite/array不代表真实数据库并发和外部资产验收。
 - TASK-005是否放行：是，允许下一任务TASK-006准入但本次不执行。主进度与证据索引在xboard-mobile的progress.md及evidence/TASK-005。
 - 交付前回归：原有 `node --test tests/runtime-regression.test.js` 12/12通过；探针及报告由.gitattributes固定LF，生产插件/主题/部署文件未修改。
+
+## 2026-09-04 TASK-002 再审查
+
+- 操作 AI 模型：GPT-5（Codex）。
+- 本阶段完成内容：为Android需求、实施计划和iOS需求三份权威文档固定LF，维持执行镜像字节一致。
+- 测试结果：xboard-mobile TASK-002完整12/12通过，官方工作树干净，权威/镜像同哈希。
+- 是否放行：是，允许TASK-003复核；未修改权威需求内容或业务实现。

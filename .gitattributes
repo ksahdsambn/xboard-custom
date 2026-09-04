@@ -4,3 +4,8 @@
 # Keep TASK-005 provenance hashes stable across Windows and Linux checkouts.
 tests/task-005/** text eol=lf
 markdown/mobile/task-005-xboard-adaptation.md text eol=lf
+
+# Canonical requirement mirrors use byte-identical SHA-256 on all platforms.
+markdown/mobile/android-app-requirements.md text eol=lf
+markdown/mobile/android-app-implementation-plan.md text eol=lf
+markdown/mobile/ios-app-requirements.md text eol=lf

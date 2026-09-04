@@ -283,3 +283,5 @@
 | `tests/task-005/Task005Probe/database/migrations/2099_01_01_000000_create_task005_probe.php` | 仅创建/移除探针独立表，验证迁移安装和卸载行为。 |
 
 这些测试不属于 `plugins/**` 部署源；禁止将其发布为MobileApp业务插件。需求2.0.1与计划1.2.0的两级资产变更继续由 `markdown/mobile/android-app-requirements.md` 与 `android-app-implementation-plan.md` 权威维护。
+
+- TASK-002再审查（GPT-5 / Codex）：`.gitattributes`进一步为三份`markdown/mobile/*-requirements.md`/Android实施计划权威镜像强制LF，防止Windows检出改变基线SHA-256。
