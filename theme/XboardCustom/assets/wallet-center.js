@@ -37,7 +37,7 @@
         checkin: "每日签到",
         topup: "余额充值",
         renew: "自动续费",
-        title: "钱包扩展",
+        title: "钱包中心",
         subtitle: "签到、充值和余额自动续费。",
         refresh: "刷新",
         loading: "正在加载",
@@ -85,7 +85,7 @@
         checkin: "Daily check-in",
         topup: "Balance top-up",
         renew: "Auto renew",
-        title: "Wallet extras",
+        title: "WalletCenter",
         subtitle: "Check-in, top-up and balance auto-renew.",
         refresh: "Refresh",
         loading: "Loading",
@@ -348,7 +348,6 @@
   }
 
   function ensureRoot() {
-    if (dom.root && document.body.contains(dom.root) && dom.panel) return;
     if (!dom.root) {
       dom.root = document.createElement("div");
       dom.root.id = "xc-wallet-root";
@@ -362,7 +361,6 @@
       dom.panel.addEventListener("submit", onSubmit);
       dom.root.appendChild(dom.panel);
     }
-    if (!document.body.contains(dom.root)) document.body.appendChild(dom.root);
   }
 
   function findOfficialWalletCard() {
@@ -375,14 +373,6 @@
       }
     }
     return null;
-  }
-
-  function clearWalletCardGap() {
-    var marked = document.querySelectorAll("[data-xc-wallet-gap]");
-    for (var i = 0; i < marked.length; i += 1) {
-      marked[i].style.marginBottom = "";
-      marked[i].removeAttribute("data-xc-wallet-gap");
-    }
   }
 
   function sampleTheme(card) {
@@ -414,33 +404,27 @@
     } catch (error) {}
   }
 
-  function syncPlacement() {
+  function detachPanel() {
+    if (dom.root && dom.root.parentElement) dom.root.remove();
+    if (dom.root) dom.root.hidden = true;
+  }
+
+  function attachPanel() {
     ensureRoot();
     if (!state.route.isWallet || isAuthPath(state.route.path)) {
-      dom.root.hidden = true;
-      clearWalletCardGap();
+      detachPanel();
       return false;
     }
     var card = findOfficialWalletCard();
-    if (!card) {
-      dom.root.hidden = true;
+    if (!card || !card.parentElement) {
       startFindLoop();
       return false;
+    }
+    if (dom.root.previousElementSibling !== card) {
+      card.insertAdjacentElement("afterend", dom.root);
     }
     sampleTheme(card);
-    var rect = card.getBoundingClientRect();
-    if (rect.width < 80) {
-      dom.root.hidden = true;
-      startFindLoop();
-      return false;
-    }
     dom.root.hidden = false;
-    dom.root.style.left = Math.max(0, rect.left) + "px";
-    dom.root.style.width = rect.width + "px";
-    dom.root.style.top = (rect.bottom + 16) + "px";
-    var height = dom.panel ? dom.panel.offsetHeight : 0;
-    card.setAttribute("data-xc-wallet-gap", "1");
-    card.style.marginBottom = Math.max(24, height + 24) + "px";
     return true;
   }
 
@@ -448,7 +432,7 @@
     if (placeTimer) return;
     placeTimer = window.requestAnimationFrame(function () {
       placeTimer = 0;
-      syncPlacement();
+      attachPanel();
     });
   }
 
@@ -457,12 +441,12 @@
     var tries = 0;
     findTimer = setInterval(function () {
       tries += 1;
-      var placed = syncPlacement();
-      if (placed || !state.route.isWallet || tries >= 80) {
+      var placed = attachPanel();
+      if (placed || !state.route.isWallet || tries >= 40) {
         clearInterval(findTimer);
         findTimer = 0;
       }
-    }, 200);
+    }, 150);
   }
 
   function currentSection() {
@@ -480,7 +464,9 @@
       history.replaceState(null, "", location.pathname + location.search + next);
       state.route = parseHash(location.hash);
     }
-    render();
+    var loaded = state.section === "checkin" ? state.checkin.status : state.section === "topup" ? state.topup.methods : state.renew.config;
+    if (loaded) render();
+    else load(true);
   }
 
   function onClick(event) {
@@ -584,8 +570,7 @@
   function render() {
     ensureRoot();
     if (!state.route.isWallet) {
-      dom.root.hidden = true;
-      clearWalletCardGap();
+      detachPanel();
       return;
     }
     var draft = state.loading ? null : captureDraft();
@@ -593,12 +578,12 @@
 
     if (state.loading) {
       dom.panel.innerHTML = '<div class="xc-wallet-head"><div><h2>' + esc(t("title")) + "</h2></div></div><div class=\"xc-wallet-body\"><p class=\"xc-wallet-note\">" + esc(t("loading")) + "</p></div>";
-      schedulePlace();
+      attachPanel();
       return;
     }
     if (!state.authed) {
       dom.panel.innerHTML = '<div class="xc-wallet-head"><div><h2>' + esc(t("title")) + "</h2></div></div><div class=\"xc-wallet-body\"><p class=\"xc-wallet-note\">" + esc(t("login")) + "</p>" + btn(t("toLogin"), 'data-xc="login"') + "</div>";
-      schedulePlace();
+      attachPanel();
       return;
     }
 
@@ -683,7 +668,7 @@
       + '<nav class="xc-wallet-tabs">' + tabs + "</nav>"
       + '<div class="xc-wallet-body">' + (bodies[section] || bodies.checkin) + "</div>";
     restoreDraft(draft);
-    schedulePlace();
+    attachPanel();
   }
 
   function amountCents(value) {
@@ -777,55 +762,119 @@
     return q;
   }
 
+  function scheduleIdleLoad() {
+    if (state.loading || !state.route.isWallet) return;
+    var run = function () {
+      if (state.route.isWallet) load(false);
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(run, { timeout: 400 });
+    } else {
+      setTimeout(run, 0);
+    }
+  }
+
+  function applySectionPayload(section, pack) {
+    if (section === "checkin") {
+      state.checkin = {
+        status: pack.status && pack.status.ok ? pack.status.data : state.checkin.status || null,
+        history: pack.history && pack.history.ok ? pack.history.data : state.checkin.history || null,
+        error: pack.status && pack.status.ok ? null : (pack.status && pack.status.error) || state.checkin.error || null
+      };
+    }
+    if (section === "topup") {
+      state.topup = {
+        methods: pack.methods && pack.methods.ok ? pack.methods.data : state.topup.methods || null,
+        history: pack.history && pack.history.ok ? pack.history.data : state.topup.history || null,
+        detail: pack.detail && pack.detail.ok ? pack.detail.data : state.topup.detail || null,
+        error: pack.methods && pack.methods.ok ? null : (pack.methods && pack.methods.error) || state.topup.error || null
+      };
+      if (state.topup.detail && state.topup.detail.order && /paid|expired|cancelled|refunded/i.test(state.topup.detail.order.status_label || "")) {
+        try { sessionStorage.removeItem(LAST_TOPUP); } catch (error) {}
+      }
+    }
+    if (section === "renew") {
+      state.renew = {
+        config: pack.config && pack.config.ok ? pack.config.data : state.renew.config || null,
+        history: pack.history && pack.history.ok ? pack.history.data : state.renew.history || null,
+        error: pack.config && pack.config.ok ? null : (pack.config && pack.config.error) || state.renew.error || null
+      };
+    }
+  }
+
+  async function fetchSection(section) {
+    if (section === "checkin") {
+      var checkin = await Promise.all([
+        safe(function () { return api("/api/v1/wallet-center/checkin/status"); }),
+        safe(function () { return api("/api/v1/wallet-center/checkin/history" + historyQuery("checkin")); })
+      ]);
+      return { status: checkin[0], history: checkin[1] };
+    }
+    if (section === "topup") {
+      var tradeNo = state.route.tradeNo || readLastTopupTradeNo();
+      var topup = await Promise.all([
+        safe(function () { return api("/api/v1/wallet-center/topup/methods"); }),
+        safe(function () { return api("/api/v1/wallet-center/topup/history" + historyQuery("topup")); }),
+        safe(function () { return tradeNo ? api("/api/v1/wallet-center/topup/detail?trade_no=" + encodeURIComponent(tradeNo)) : Promise.resolve(null); })
+      ]);
+      return { methods: topup[0], history: topup[1], detail: topup[2] };
+    }
+    var renew = await Promise.all([
+      safe(function () { return api("/api/v1/wallet-center/auto-renew/config"); }),
+      safe(function () { return api("/api/v1/wallet-center/auto-renew/history" + historyQuery("renew")); })
+    ]);
+    return { config: renew[0], history: renew[1] };
+  }
+
   async function load(force) {
     state.locale = detectLocale();
     state.token = token();
+    if (!state.route.isWallet && !force) {
+      detachPanel();
+      return;
+    }
     if (!state.token) {
       state.authed = false;
       state.loading = false;
       return render();
     }
-    if (!state.route.isWallet && !force) {
-      return render();
-    }
+    var section = currentSection();
     var showSpinner = !state.authed || !dom.panel || !dom.panel.innerHTML;
     if (showSpinner) {
       state.loading = true;
       render();
     }
     var rid = ++state.rid;
-    var tradeNo = state.route.tradeNo || readLastTopupTradeNo();
-    var all = await Promise.all([
-      safe(function () { return api("/api/v1/user/info"); }),
-      safe(function () { return api("/api/v1/user/getSubscribe"); }),
-      safe(function () { return api("/api/v1/user/comm/config"); }),
-      safe(function () { return api("/api/v1/wallet-center/checkin/status"); }),
-      safe(function () { return api("/api/v1/wallet-center/checkin/history" + historyQuery("checkin")); }),
-      safe(function () { return api("/api/v1/wallet-center/topup/methods"); }),
-      safe(function () { return api("/api/v1/wallet-center/topup/history" + historyQuery("topup")); }),
-      safe(function () { return tradeNo ? api("/api/v1/wallet-center/topup/detail?trade_no=" + encodeURIComponent(tradeNo)) : Promise.resolve(null); }),
-      safe(function () { return api("/api/v1/wallet-center/auto-renew/config"); }),
-      safe(function () { return api("/api/v1/wallet-center/auto-renew/history" + historyQuery("renew")); })
-    ]);
+    var comm = state.comm ? { ok: true, data: state.comm } : await safe(function () { return api("/api/v1/user/comm/config"); });
+    var pack = await fetchSection(section);
     if (rid !== state.rid) return;
-    if (!all[0].ok) {
+    var probe = pack.status || pack.methods || pack.config || comm;
+    if (probe && !probe.ok && probe.error && probe.error.status === 401) {
       state.authed = false;
       state.loading = false;
       return render();
     }
     state.authed = true;
-    state.user = all[0].data;
-    state.subscribe = all[1].ok ? all[1].data : null;
-    state.comm = all[2].ok ? all[2].data : null;
-    state.checkin = { status: all[3].ok ? all[3].data : null, history: all[4].ok ? all[4].data : null, error: all[3].ok ? null : all[3].error };
-    state.topup = { methods: all[5].ok ? all[5].data : null, history: all[6].ok ? all[6].data : null, detail: all[7].ok ? all[7].data : null, error: all[5].ok ? null : all[5].error };
-    state.renew = { config: all[8].ok ? all[8].data : null, history: all[9].ok ? all[9].data : null, error: all[8].ok ? null : all[8].error };
-    if (state.topup.detail && state.topup.detail.order && /paid|expired|cancelled|refunded/i.test(state.topup.detail.order.status_label || "")) {
-      try { sessionStorage.removeItem(LAST_TOPUP); } catch (error) {}
-    }
+    if (comm.ok) state.comm = comm.data;
+    applySectionPayload(section, pack);
     state.loading = false;
     render();
     scheduleTopupPoll();
+    if (!force) schedulePrefetch(section);
+  }
+
+  function schedulePrefetch(loadedSection) {
+    var extras = ["checkin", "topup", "renew"].filter(function (key) { return key !== loadedSection; });
+    var run = function () {
+      extras.forEach(function (key) {
+        fetchSection(key).then(function (pack) { applySectionPayload(key, pack); });
+      });
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(run, { timeout: 1500 });
+    } else {
+      setTimeout(run, 800);
+    }
   }
 
   function scheduleTopupPoll() {
@@ -844,7 +893,12 @@
     canonicalizeWalletHash();
     state.route = parseHash(location.hash);
     if (state.route.section) state.section = state.route.section;
-    load(false);
+    if (!state.route.isWallet) {
+      detachPanel();
+      return;
+    }
+    attachPanel();
+    scheduleIdleLoad();
     startFindLoop();
   }
 
@@ -853,19 +907,19 @@
     state.route = parseHash(location.hash);
     if (state.route.section) state.section = state.route.section;
     ensureRoot();
-    load(false);
-    startFindLoop();
     if (document.body) {
       var observer = new MutationObserver(function () {
         if (!state.route.isWallet) return;
-        if (dom.root && !document.body.contains(dom.root)) document.body.appendChild(dom.root);
         schedulePlace();
       });
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.getElementById("app") || document.body, { childList: true, subtree: true });
     }
     addEventListener("hashchange", sync);
-    addEventListener("scroll", schedulePlace, true);
-    addEventListener("resize", schedulePlace);
+    if (state.route.isWallet) {
+      attachPanel();
+      scheduleIdleLoad();
+      startFindLoop();
+    }
   }
 
   if (document.readyState === "loading") {

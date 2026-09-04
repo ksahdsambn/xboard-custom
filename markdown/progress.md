@@ -637,3 +637,21 @@
 ### 是否放行
 
 - 是。
+
+## 2026-09-04 WalletCenter 滚动 / 对齐 / 加载 / 译名
+
+### 完成内容
+
+- 钱包中心改为插入官方「我的钱包」卡片后方的文档流，不再使用 `position: fixed` 浮层，鼠标悬停时页面可正常滚动，左右对齐随父级卡片自动完成。
+- 首屏只请求当前页签接口，其余页签在空闲时预取；脚本改为 `defer`，不再在个人中心之外打满 10 个接口。
+- 产品名按 WalletCenter 重译：简体「钱包中心」，繁体「錢包中心」，英语保持 WalletCenter，并同步到 13 种附加语言。
+
+### 测试结果
+
+- `node --test tests/runtime-regression.test.js`：全部通过。
+- `node --check theme/XboardCustom/assets/wallet-center.js`：通过。
+- `node --check theme/XboardCustom/assets/i18n-extra.js`：通过。
+
+### 是否放行
+
+- 是。

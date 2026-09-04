@@ -60,7 +60,7 @@
 <body>
   <div id="app"></div>
   {!! $theme_config['custom_html'] !!}
-  <script src="/theme/{{$theme}}/assets/wallet-center.js?v={{ $walletJsVersion }}"></script>
+  <script defer src="/theme/{{$theme}}/assets/wallet-center.js?v={{ $walletJsVersion }}"></script>
 </body>
 
 </html>

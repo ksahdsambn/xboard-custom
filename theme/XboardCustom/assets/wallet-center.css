@@ -1,7 +1,10 @@
 #xc-wallet-root {
-  position: fixed;
-  z-index: 20;
-  pointer-events: none;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-block-start: 16px;
+  margin-inline: 0;
+  pointer-events: auto;
   box-sizing: border-box;
 }
 
@@ -15,7 +18,7 @@
   width: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--xc-text, #1f2225);
   background: var(--xc-card-bg, #fff);
   border: 1px solid var(--xc-card-border, rgba(239, 239, 245, 1));

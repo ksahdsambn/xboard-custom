@@ -52,6 +52,11 @@ test('Wallet hash canonicalizes legacy wallet query onto official profile', () =
   assert.match(source, /xc-wallet-root/);
   assert.match(source, /restoreDraft/);
   assert.match(source, /function startFindLoop/);
+  assert.match(source, /insertAdjacentElement\("afterend"/);
+  assert.match(source, /requestIdleCallback/);
+  assert.match(source, /function fetchSection/);
+  assert.match(source, /title: "钱包中心"/);
+  assert.doesNotMatch(source, /addEventListener\("scroll"/);
 });
 
 test('Auth page state sync adds delayed corrections and clears auth locale layout off auth routes', () => {
@@ -131,4 +136,16 @@ test('Wallet RTL uses logical inset properties', () => {
   assert.match(source, /html\[dir="rtl"\]/);
   assert.match(source, /#xc-wallet-root/);
   assert.match(source, /pointer-events:\s*auto/);
+  assert.match(source, /#xc-wallet-root \{\s*position: relative;/);
+  assert.doesNotMatch(source, /#xc-wallet-root \{\s*position: fixed;/);
+});
+
+test('WalletCenter title is localized as a center, not extras', () => {
+  const extra = readSource('theme/XboardCustom/assets/i18n-extra.js');
+  assert.match(extra, /"title":\s*"钱包中心"/);
+  assert.match(extra, /"title":\s*"WalletCenter"/);
+  assert.match(extra, /"title":\s*"錢包中心"/);
+  assert.doesNotMatch(extra, /钱包扩展/);
+  assert.doesNotMatch(extra, /Extensions du portefeuille/);
+  assert.doesNotMatch(extra, /Wallet-Erweiterungen/);
 });
