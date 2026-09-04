@@ -265,3 +265,21 @@
 ### 本轮结论
 
 - 本轮仓库级回归确认：除插件/主题源码本身外，发布脚本与压缩静态资源也是可导致线上行为偏差的第一类资产，后续维护中必须与源码一起审查和回归。
+
+## 2026-09-04 TASK-005 文件洞察（GPT-5 / Codex）
+
+| 文件 | 作用 |
+| --- | --- |
+| `markdown/mobile/task-005-xboard-adaptation.md` | 官方冻结基线的扩展点清单、服务接口、运行事实、风险、插件内替代方案与后续任务归属；同时登记32份被审查上游文件的作用。 |
+| `.gitattributes` | 保持原有自动文本规范，并为TASK-005测试文件和适配报告强制LF，避免跨平台检出改变证据SHA-256。 |
+| `tests/task-005/README.md` | 运行前提、命令、临时环境/缓存替代边界、敏感数据策略和禁止生产部署声明。 |
+| `tests/task-005/run.ps1` | 从官方不可变提交归档，建立无挂载的临时PHP容器；严格安装锁定依赖，运行前断网，收集源/测试哈希并清理，失败非零退出。 |
+| `tests/task-005/audit.php` | 用官方Laravel迁移和完整HTTP Kernel测试插件、会话、注册、套餐、节点、公告、工单；输出脱敏JSON，复现并标注上游风险。 |
+| `tests/task-005/Task005Probe/config.json` | 独立非生产探针身份、版本和boolean默认配置。 |
+| `tests/task-005/Task005Probe/Plugin.php` | 记录安装、启动、升级和清理调用，并注册一条计划任务；没有业务hook。 |
+| `tests/task-005/Task005Probe/Providers/PluginServiceProvider.php` | 注册内存标记以验证provider加载。 |
+| `tests/task-005/Task005Probe/Commands/Probe.php` | 输出probe-ok的无业务副作用命令，用于确认命令注册。 |
+| `tests/task-005/Task005Probe/routes/api.php` | 对比无隐式版本前缀与显式Mobile前缀，提供公共/用户鉴权探针路由。 |
+| `tests/task-005/Task005Probe/database/migrations/2099_01_01_000000_create_task005_probe.php` | 仅创建/移除探针独立表，验证迁移安装和卸载行为。 |
+
+这些测试不属于 `plugins/**` 部署源；禁止将其发布为MobileApp业务插件。需求2.0.1与计划1.2.0的两级资产变更继续由 `markdown/mobile/android-app-requirements.md` 与 `android-app-implementation-plan.md` 权威维护。

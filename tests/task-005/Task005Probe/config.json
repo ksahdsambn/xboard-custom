@@ -1,0 +1,9 @@
+{
+  "name": "TASK-005 isolated lifecycle probe",
+  "code": "task005_probe",
+  "version": "1.0.0",
+  "description": "Test fixture only; never install in production or deploy overlay.",
+  "author": "xboard-mobile development audit",
+  "type": "feature",
+  "config": { "probe_enabled": { "type": "boolean", "default": true } }
+}

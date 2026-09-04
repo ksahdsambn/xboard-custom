@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Keep TASK-005 provenance hashes stable across Windows and Linux checkouts.
+tests/task-005/** text eol=lf
+markdown/mobile/task-005-xboard-adaptation.md text eol=lf
