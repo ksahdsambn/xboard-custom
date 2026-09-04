@@ -411,7 +411,9 @@
 
   function attachPanel() {
     ensureRoot();
-    if (!state.route.isWallet || isAuthPath(state.route.path)) {
+    var parsed = parseHash(location.hash);
+    state.route = parsed;
+    if (!parsed.isWallet || isAuthPath(parsed.path)) {
       detachPanel();
       return false;
     }
@@ -437,16 +439,46 @@
   }
 
   function startFindLoop() {
-    if (findTimer || !state.route.isWallet) return;
-    var tries = 0;
+    if (findTimer) return;
     findTimer = setInterval(function () {
-      tries += 1;
-      var placed = attachPanel();
-      if (placed || !state.route.isWallet || tries >= 40) {
+      var parsed = parseHash(location.hash);
+      if (!parsed.isWallet) {
+        clearInterval(findTimer);
+        findTimer = 0;
+        return;
+      }
+      if (attachPanel() && dom.root && dom.root.parentElement && !dom.root.hidden) {
         clearInterval(findTimer);
         findTimer = 0;
       }
-    }, 150);
+    }, 100);
+  }
+
+  function syncFromLocation() {
+    canonicalizeWalletHash();
+    var parsed = parseHash(location.hash);
+    var entered = parsed.isWallet && !state.route.isWallet;
+    state.route = parsed;
+    if (parsed.section) state.section = parsed.section;
+    if (!parsed.isWallet) {
+      detachPanel();
+      return;
+    }
+    attachPanel();
+    startFindLoop();
+    if (entered || (!state.authed && !state.loading)) scheduleIdleLoad();
+  }
+
+  function wrapHistory(method) {
+    var original = history[method];
+    if (typeof original !== "function" || original.__xcWalletWrapped) return;
+    var wrapped = function () {
+      var result = original.apply(this, arguments);
+      queueMicrotask(syncFromLocation);
+      return result;
+    };
+    wrapped.__xcWalletWrapped = true;
+    history[method] = wrapped;
   }
 
   function currentSection() {
@@ -888,38 +920,27 @@
     topupPollTimer = setTimeout(function () { load(true); }, 3000);
   }
 
-  function sync() {
-    state.locale = detectLocale();
-    canonicalizeWalletHash();
-    state.route = parseHash(location.hash);
-    if (state.route.section) state.section = state.route.section;
-    if (!state.route.isWallet) {
-      detachPanel();
-      return;
-    }
-    attachPanel();
-    scheduleIdleLoad();
-    startFindLoop();
-  }
-
   function init() {
     canonicalizeWalletHash();
     state.route = parseHash(location.hash);
     if (state.route.section) state.section = state.route.section;
     ensureRoot();
+    wrapHistory("pushState");
+    wrapHistory("replaceState");
+    addEventListener("hashchange", syncFromLocation);
+    addEventListener("popstate", syncFromLocation);
     if (document.body) {
       var observer = new MutationObserver(function () {
-        if (!state.route.isWallet) return;
-        schedulePlace();
+        var parsed = parseHash(location.hash);
+        if (parsed.isWallet !== state.route.isWallet || parsed.path !== state.route.path) {
+          syncFromLocation();
+          return;
+        }
+        if (parsed.isWallet) schedulePlace();
       });
       observer.observe(document.getElementById("app") || document.body, { childList: true, subtree: true });
     }
-    addEventListener("hashchange", sync);
-    if (state.route.isWallet) {
-      attachPanel();
-      scheduleIdleLoad();
-      startFindLoop();
-    }
+    syncFromLocation();
   }
 
   if (document.readyState === "loading") {

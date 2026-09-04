@@ -52,6 +52,8 @@ test('Wallet hash canonicalizes legacy wallet query onto official profile', () =
   assert.match(source, /xc-wallet-root/);
   assert.match(source, /restoreDraft/);
   assert.match(source, /function startFindLoop/);
+  assert.match(source, /function wrapHistory/);
+  assert.match(source, /function syncFromLocation/);
   assert.match(source, /insertAdjacentElement\("afterend"/);
   assert.match(source, /requestIdleCallback/);
   assert.match(source, /function fetchSection/);

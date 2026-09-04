@@ -655,3 +655,20 @@
 ### 是否放行
 
 - 是。
+
+## 2026-09-04 个人中心首次进入不显示钱包中心
+
+### 完成内容
+
+- 官方 Vue 路由用 `history.pushState` 进入 `#/profile` 时不会触发 `hashchange`，首次点「个人中心」因此不会挂载钱包中心。
+- 改为拦截 `pushState` / `replaceState`，并同时监听 `hashchange` 与 `popstate`；MutationObserver 每次从 `location.hash` 重新判断路由。
+- 找到「我的钱包」卡片后立刻插入；若被 Vue 重绘摘掉则再次插入。
+
+### 测试结果
+
+- `node --test tests/runtime-regression.test.js`：全部通过。
+- `node --check theme/XboardCustom/assets/wallet-center.js`：通过。
+
+### 是否放行
+
+- 是。
