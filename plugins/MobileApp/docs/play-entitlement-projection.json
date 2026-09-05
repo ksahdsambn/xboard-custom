@@ -1,0 +1,12 @@
+{
+  "taskId": "TASK-033",
+  "unique": "idempotency_key",
+  "lock": ["users row", "projection row"],
+  "grantable": ["purchased", "grace", "restored", "canceled"],
+  "terminal": ["expired", "refunded", "revoked", "account_hold", "pending", "invalid"],
+  "merge": "max(web baseline, current user expiry, play expiry); never shorten",
+  "duplicate": "same idempotency_key returns existing projection without restacking traffic or expiry",
+  "entitlementApi": "EntitlementService",
+  "walletCenterExclusionDeferredTo": "TASK-034",
+  "realGooglePlayClaimed": false
+}

@@ -14,5 +14,9 @@ class RtdnEvent extends Model
         'received_at' => 'datetime',
         'processed_at' => 'datetime',
         'next_retry_at' => 'datetime',
+        'event_time_millis' => 'integer',
+        'claimed_notification_type' => 'integer',
+        'apply_count' => 'integer',
+        'retry_count' => 'integer',
     ];
 }

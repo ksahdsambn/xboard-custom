@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\UserService;
 use DateTimeInterface;
 use Plugin\MobileApp\Models\EntitlementProjection;
+use Plugin\MobileApp\Models\PurchaseToken;
 
 final class EntitlementService
 {
@@ -93,11 +94,14 @@ final class EntitlementService
         $plan = $this->resolvePlan($user, $projection);
         $resetAt = $this->resetAtEpochMs($user);
         $daysUntilReset = $this->users->getResetDay($user);
+        $walletBlock = $this->walletAutoRenewBlockReason($user);
 
         return [
             'connectAllowed' => $status === 'active',
             'source' => $source,
             'playManaged' => $source === 'play',
+            'walletAutoRenewBlocked' => $walletBlock !== null,
+            'walletAutoRenewBlockReason' => $walletBlock,
             'status' => $status,
             'expiresAtEpochMs' => $expiry === null ? null : ((int) $expiry * 1000),
             'remainingTrafficBytes' => $remaining,
@@ -109,6 +113,23 @@ final class EntitlementService
             'planName' => $plan?->name,
             'denialCode' => $denial,
         ];
+    }
+
+    public function walletAutoRenewBlockReason(User $user): ?string
+    {
+        $now = time();
+        if ($this->activePlayProjection($user, $now) !== null) {
+            return 'play_managed_entitlement';
+        }
+        $hold = PurchaseToken::query()
+            ->where('user_id', $user->id)
+            ->where('platform', PlayPurchaseService::PLATFORM)
+            ->where('play_status', 'account_hold')
+            ->exists();
+        if ($hold) {
+            return 'play_account_hold';
+        }
+        return null;
     }
 
     public function laterExpiry(bool $webGrant, mixed $webExpiry, bool $playGrant, mixed $playExpiry): ?int

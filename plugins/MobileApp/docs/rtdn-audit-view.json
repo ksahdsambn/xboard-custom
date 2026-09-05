@@ -1,0 +1,17 @@
+{
+  "taskId": "TASK-032",
+  "path": "GET /admin/rtdn-events",
+  "auth": "admin",
+  "fields": [
+    "eventId",
+    "environment",
+    "processingStatus",
+    "retryCount",
+    "lastError",
+    "playStatusApplied",
+    "applyCount",
+    "receivedAt",
+    "processedAt"
+  ],
+  "forbidden": ["purchaseToken", "privateKey", "entitlement", "rawPayload"]
+}

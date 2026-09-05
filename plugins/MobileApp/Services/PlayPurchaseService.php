@@ -156,6 +156,7 @@ final class PlayPurchaseService
             }
 
             $row->save();
+            (new EntitlementProjectionService())->project($user, $row, $snapshot);
             MobileLogRedactor::error('play_purchase', [
                 'playStatus' => $status,
                 'restore' => $restore,
@@ -221,6 +222,64 @@ final class PlayPurchaseService
             'status' => 'active',
             'request_id' => $requestId,
         ]);
+    }
+
+    public function applyRecheckedSnapshot(PurchaseToken $row, array $snapshot): array
+    {
+        $status = (string) ($snapshot['playStatus'] ?? '');
+        $digest = hash('sha256', (string) $row->purchase_token_hash . '|' . $status . '|' . (string) ($snapshot['expiryTime'] ?? ''));
+        $previous = (string) ($row->last_applied_digest ?? '');
+        $changed = $digest !== $previous;
+        $row->play_status = $status;
+        if (($snapshot['productId'] ?? '') !== '') {
+            $row->product_id = (string) $snapshot['productId'];
+        }
+        if (($snapshot['packageName'] ?? '') !== '') {
+            $row->package_name = (string) $snapshot['packageName'];
+        }
+        $ext = (string) ($snapshot['externalSubscriptionId'] ?? '');
+        if ($ext !== '') {
+            $conflict = PurchaseToken::query()
+                ->where('platform', self::PLATFORM)
+                ->where('external_subscription_id', $ext)
+                ->where('id', '!=', $row->id)
+                ->exists();
+            if (!$conflict) {
+                $row->external_subscription_id = $ext;
+            }
+        }
+        $row->is_renewal = (bool) ($snapshot['isRenewal'] ?? $row->is_renewal);
+        $row->verified_at = now();
+        $row->last_applied_digest = $digest;
+        $row->last_error = null;
+        if (in_array($status, self::GRANTABLE, true) && $row->granted_at === null) {
+            $row->granted_at = now();
+        }
+        $row->save();
+        $owner = User::query()->whereKey($row->user_id)->lockForUpdate()->first();
+        if ($owner instanceof User) {
+            (new EntitlementProjectionService())->project($owner, $row, $snapshot);
+        }
+        MobileLogRedactor::error('play_rtdn_recheck', [
+            'playStatus' => $status,
+            'ledgerId' => $row->id,
+            'changed' => $changed,
+            'tokenHashPrefix' => substr((string) $row->purchase_token_hash, 0, 8),
+        ]);
+        return [
+            'changed' => $changed,
+            'playStatus' => $status,
+            'digest' => $digest,
+        ];
+    }
+
+    public function findByTokenHash(string $hash): ?PurchaseToken
+    {
+        return PurchaseToken::query()
+            ->where('platform', self::PLATFORM)
+            ->where('purchase_token_hash', $hash)
+            ->lockForUpdate()
+            ->first();
     }
 
     private function markInvalid(PurchaseToken $row, string $code): void

@@ -14,8 +14,10 @@ use Plugin\MobileApp\Controllers\NoticeController;
 use Plugin\MobileApp\Controllers\PlanController;
 use Plugin\MobileApp\Controllers\PlayPurchaseController;
 use Plugin\MobileApp\Controllers\ProfileController;
+use Plugin\MobileApp\Controllers\RtdnController;
 use Plugin\MobileApp\Controllers\SkeletonController;
 use Plugin\MobileApp\Controllers\TicketController;
+use Plugin\MobileApp\Controllers\AdminRtdnController;
 
 $registerVersion = static function (string $version): void {
     $namePrefix = 'mobile.v' . $version . '.';
@@ -65,9 +67,10 @@ $registerVersion = static function (string $version): void {
             Route::put('play-products', [AdminPlayProductController::class, 'upsert'])->name($namePrefix . 'admin.playProducts.upsert');
             Route::get('compat', [AdminCompatController::class, 'show'])->name($namePrefix . 'admin.compat.get');
             Route::put('compat', [AdminCompatController::class, 'update'])->name($namePrefix . 'admin.compat.update');
+            Route::get('rtdn-events', [AdminRtdnController::class, 'index'])->name($namePrefix . 'admin.rtdnEvents.list');
         });
 
-        Route::post('platform/google/rtdn', [$controller, 'notImplemented'])
+        Route::post('platform/google/rtdn', [RtdnController::class, 'handle'])
             ->middleware('mobile.google.rtdn')
             ->name($namePrefix . 'platform.google.rtdn');
     });

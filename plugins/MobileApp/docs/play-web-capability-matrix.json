@@ -1,0 +1,16 @@
+{
+  "taskId": "TASK-034",
+  "playClient": {
+    "walletTopup": false,
+    "stripeUrl": false,
+    "bepusdt": false,
+    "webCheckout": false,
+    "walletAutoRenew": false
+  },
+  "webUser": {
+    "walletTopup": true,
+    "walletAutoRenew": true,
+    "checkin": true
+  },
+  "walletSkipReasons": ["play_managed_entitlement", "play_account_hold"]
+}

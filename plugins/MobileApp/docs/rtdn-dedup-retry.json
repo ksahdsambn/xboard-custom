@@ -1,0 +1,13 @@
+{
+  "taskId": "TASK-032",
+  "unique": ["platform", "event_id"],
+  "recheck": "PlayDeveloperAdapter.getSubscription",
+  "untrusted": ["notificationType", "claimed playStatus", "planId", "expiresAt", "entitlement"],
+  "maxRetries": 5,
+  "backoffSeconds": [60, 120, 240, 480, 960],
+  "deadLetterStatus": "dead_letter",
+  "applyOnce": "same event_id and same applied_digest do not increment apply_count",
+  "userRowProjectionDeferredTo": "TASK-033",
+  "realGooglePlayClaimed": false,
+  "evidenceClass": "non-production-simulation"
+}

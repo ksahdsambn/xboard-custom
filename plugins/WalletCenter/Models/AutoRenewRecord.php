@@ -69,6 +69,8 @@ class AutoRenewRecord extends Model
             'runtime_error' => '自动续费执行出错。',
             'disabled_by_user' => '已关闭自动续费。',
             'renewed' => '自动续费已通过官方订单开通完成。',
+            'play_managed_entitlement' => 'Google Play 管理的权益不使用余额自动续费。',
+            'play_account_hold' => 'Google Play 账号保留期间不使用余额自动续费。',
             default => null,
         };
     }

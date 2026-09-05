@@ -422,4 +422,36 @@
 - 阶段 TASK-031 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 购买接线；RTDN 仍为骨架。
 - 阶段 TASK-031 | `tests/task-031/**` | `MobileApp` | 首次购买、幂等、状态矩阵、拒绝分支和脱敏测试。
 
+## 2026-09-06 TASK-032 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-032 | `plugins/MobileApp/Services/RtdnService.php` | `MobileApp` | RTDN 接收、去重、Developer API 重查、有上限重试与审计视图；不信任通知正文。
+- 阶段 TASK-032 | `plugins/MobileApp/Controllers/RtdnController.php` | `MobileApp` | `POST /platform/google/rtdn`。
+- 阶段 TASK-032 | `plugins/MobileApp/Controllers/AdminRtdnController.php` | `MobileApp` | `GET /admin/rtdn-events` 脱敏审计。
+- 阶段 TASK-032 | `plugins/MobileApp/Http/Middleware/VerifyGoogleRtdn.php` | `MobileApp` | 夹具通道令牌与 HMAC 签名校验。
+- 阶段 TASK-032 | `plugins/MobileApp/Commands/RtdnRetryCommand.php` | `MobileApp` | 到期 RTDN 重试命令。
+- 阶段 TASK-032 | `plugins/MobileApp/database/migrations/2026_09_06_230000_add_rtdn_recheck_columns.php` | `MobileApp` | 重查哈希、应用计数与账本 digest 列。
+- 阶段 TASK-032 | `plugins/MobileApp/docs/rtdn-dedup-retry.json` | `MobileApp` | 去重与重试规则。
+- 阶段 TASK-032 | `plugins/MobileApp/docs/rtdn-dedup-retry.md` | `MobileApp` | 去重与重试说明。
+- 阶段 TASK-032 | `plugins/MobileApp/docs/rtdn-audit-view.json` | `MobileApp` | 审计字段与禁止项。
+- 阶段 TASK-032 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 RTDN 与审计接线；用户行投影仍延期。
+- 阶段 TASK-032 | `tests/task-032/**` | `MobileApp` | 验签、环境、去重、乱序、重试和脱敏测试。
+
+## 2026-09-06 TASK-033 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-033 | `plugins/MobileApp/Services/EntitlementProjectionService.php` | `MobileApp` | 用户行锁内投影 Play 账本；幂等；不缩短更长期 Web 权益。
+- 阶段 TASK-033 | `plugins/MobileApp/database/migrations/2026_09_06_240000_add_entitlement_projection_baseline_columns.php` | `MobileApp` | Web 基线列。
+- 阶段 TASK-033 | `plugins/MobileApp/docs/play-entitlement-projection.json` | `MobileApp` | 投影规则。
+- 阶段 TASK-033 | `plugins/MobileApp/docs/play-entitlement-projection.md` | `MobileApp` | 投影说明。
+- 阶段 TASK-033 | `plugins/MobileApp/Services/PlayPurchaseService.php` | `MobileApp` | 购买与 RTDN 重查后调用投影。
+- 阶段 TASK-033 | `tests/task-033/**` | `MobileApp` | Web 长权益、重复、退款、撤销、恢复测试。
+
+## 2026-09-06 TASK-034 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-034 | `plugins/MobileApp/Services/EntitlementService.php` | `MobileApp` | 暴露 playManaged 与 walletAutoRenewBlocked。
+- 阶段 TASK-034 | `plugins/WalletCenter/Services/AutoRenewService.php` | `WalletCenter` | 扫描/开关排除 Play 管理权益，跳过不扣余额。
+- 阶段 TASK-034 | `plugins/WalletCenter/Models/AutoRenewRecord.php` | `WalletCenter` | Play 跳过原因文案。
+- 阶段 TASK-034 | `plugins/MobileApp/docs/play-web-capability-matrix.json` | `MobileApp` | Play/Web 能力矩阵。
+- 阶段 TASK-034 | `plugins/MobileApp/docs/play-web-capability-matrix.md` | `MobileApp` | 能力矩阵说明。
+- 阶段 TASK-034 | `tests/task-034/**` | `MobileApp` | Play 各态跳过、Web 不拦截、目录禁字段测试。
+
 

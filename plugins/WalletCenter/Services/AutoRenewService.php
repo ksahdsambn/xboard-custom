@@ -61,6 +61,10 @@ class AutoRenewService
         $result['subscription']['next_scan_at'] = (bool) optional($setting)->enabled
             ? $this->formatDateTime($nextScanAt)
             : null;
+        $playReason = $this->playManagedBlockReason($user);
+        $result['subscription']['play_managed'] = $playReason !== null;
+        $result['config']['play_managed_blocked'] = $playReason !== null;
+        $result['config']['play_managed_reason'] = $playReason;
 
         return $result;
     }
@@ -253,6 +257,29 @@ class AutoRenewService
                     ->whereKey($lockedSetting->user_id)
                     ->lockForUpdate()
                     ->first();
+
+                $playReason = $this->playManagedBlockReason($lockedUser);
+                if ($playReason) {
+                    $context = $this->resolveContext($lockedUser, $lockedSetting);
+                    $balance = (int) ($lockedUser->balance ?? 0);
+                    $expiredAt = (int) ($lockedUser->expired_at ?? 0);
+                    $record = $this->createRecord(
+                        $lockedSetting,
+                        $context,
+                        AutoRenewRecord::STATUS_SKIPPED,
+                        $playReason,
+                        [
+                            'play_managed' => true,
+                            'balance_before' => $balance,
+                            'balance_after' => $balance,
+                            'expired_at_before' => $expiredAt,
+                            'expired_at_after' => $expiredAt,
+                        ],
+                        now()->addDay()
+                    );
+                    $this->syncSetting($lockedSetting, $context, $record);
+                    return $record;
+                }
 
                 $context = $this->resolveContext($lockedUser, $lockedSetting);
                 if (!$context['renewable']) {
@@ -711,8 +738,19 @@ class AutoRenewService
             && (int) $user->expired_at > time();
     }
 
+    protected function playManagedBlockReason(?User $user): ?string
+    {
+        if (!$user || !class_exists(\Plugin\MobileApp\Services\EntitlementService::class)) {
+            return null;
+        }
+        return (new \Plugin\MobileApp\Services\EntitlementService($this->userService))->walletAutoRenewBlockReason($user);
+    }
+
     protected function resolveReason(User $user, ?Plan $plan, ?string $period, int $amount): ?string
     {
+        if ($playReason = $this->playManagedBlockReason($user)) {
+            return $playReason;
+        }
         if ($user->banned) {
             return 'user_banned';
         }
@@ -776,6 +814,8 @@ class AutoRenewService
             'runtime_error' => '自动续费执行出错。',
             'disabled_by_user' => '已关闭自动续费。',
             'renewed' => '自动续费已通过官方订单开通完成。',
+            'play_managed_entitlement' => 'Google Play 管理的权益不使用余额自动续费。',
+            'play_account_hold' => 'Google Play 账号保留期间不使用余额自动续费。',
             default => '当前无法使用自动续费。',
         };
     }
