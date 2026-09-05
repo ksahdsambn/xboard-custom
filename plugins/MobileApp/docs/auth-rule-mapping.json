@@ -1,0 +1,39 @@
+{
+  "taskId": "TASK-021",
+  "evidenceClass": "non-production-simulation",
+  "formalAcceptanceClaimed": false,
+  "delegatesTo": {
+    "register": "App\\Services\\Auth\\RegisterService::register",
+    "login": "App\\Services\\Auth\\LoginService::login",
+    "passwordReset": "App\\Services\\Auth\\LoginService::resetPassword",
+    "session": "App\\Services\\AuthService::generateAuthData",
+    "captcha": "App\\Services\\CaptchaService::verify via RegisterService",
+    "sanctum": "Laravel Sanctum personal access tokens"
+  },
+  "notReimplemented": [
+    "password hashing",
+    "password error counters",
+    "register IP limits",
+    "email whitelist",
+    "gmail alias",
+    "stop_register",
+    "invite_force",
+    "email_verify",
+    "captcha providers"
+  ],
+  "eligibilityParity": "Same register, login and reset inputs must produce the same allow-or-deny result as the official services. HTTP status and envelope may differ.",
+  "rules": [
+    {"rule": "stop_register", "official": "RegisterService validateRegister returns 400 Registration has closed", "mobileCode": "AUTH_REGISTER_DISABLED"},
+    {"rule": "captcha", "official": "CaptchaService missing or invalid token returns 400", "mobileCode": "AUTH_CAPTCHA_FAILED"},
+    {"rule": "email_whitelist", "official": "Email suffix is not in the Whitelist 400", "mobileCode": "AUTH_EMAIL_RESTRICTED"},
+    {"rule": "gmail_alias", "official": "Gmail alias is not supported 400", "mobileCode": "AUTH_EMAIL_RESTRICTED"},
+    {"rule": "invite_force", "official": "You must use the invitation code 422", "mobileCode": "AUTH_INVITE_REQUIRED"},
+    {"rule": "invite_invalid", "official": "ApiException Invalid invitation code", "mobileCode": "AUTH_INVITE_INVALID"},
+    {"rule": "email_code", "official": "Incorrect or empty email verification code", "mobileCode": "AUTH_EMAIL_CODE_INVALID"},
+    {"rule": "email_exists", "official": "400201 Email already exists", "mobileCode": "AUTH_EMAIL_EXISTS"},
+    {"rule": "password_error", "official": "400 Incorrect email or password", "mobileCode": "AUTH_CREDENTIALS_INVALID"},
+    {"rule": "password_limit", "official": "429 after password_limit_count", "mobileCode": "AUTH_RATE_LIMITED"},
+    {"rule": "banned", "official": "400 Your account has been suspended", "mobileCode": "AUTH_ACCOUNT_BANNED"},
+    {"rule": "reset_limit", "official": "429 after three forget attempts", "mobileCode": "AUTH_RATE_LIMITED"}
+  ]
+}

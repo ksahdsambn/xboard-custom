@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Plugin\MobileApp\Controllers\AdminCompatController;
+use Plugin\MobileApp\Controllers\AuthController;
 use Plugin\MobileApp\Controllers\BootstrapController;
 use Plugin\MobileApp\Controllers\LegalController;
 use Plugin\MobileApp\Controllers\SkeletonController;
@@ -16,14 +17,14 @@ $registerVersion = static function (string $version): void {
         Route::get('legal/terms', [LegalController::class, 'terms'])->name($namePrefix . 'legal.terms.get');
         Route::get('legal/account-deletion', [LegalController::class, 'accountDeletion'])->name($namePrefix . 'legal.accountDeletion.get');
         Route::get('legal/support', [LegalController::class, 'support'])->name($namePrefix . 'legal.support.get');
-        Route::post('auth/register', [$controller, 'notImplemented'])->name($namePrefix . 'auth.register');
-        Route::post('auth/login', [$controller, 'notImplemented'])->name($namePrefix . 'auth.login');
-        Route::post('auth/email-code', [$controller, 'notImplemented'])->name($namePrefix . 'auth.emailCode');
-        Route::post('auth/password-reset', [$controller, 'notImplemented'])->name($namePrefix . 'auth.passwordReset');
+        Route::post('auth/register', [AuthController::class, 'register'])->name($namePrefix . 'auth.register');
+        Route::post('auth/login', [AuthController::class, 'login'])->name($namePrefix . 'auth.login');
+        Route::post('auth/email-code', [AuthController::class, 'emailCode'])->name($namePrefix . 'auth.emailCode');
+        Route::post('auth/password-reset', [AuthController::class, 'passwordReset'])->name($namePrefix . 'auth.passwordReset');
 
         Route::middleware('user')->group(function () use ($namePrefix, $controller): void {
-            Route::get('auth/session', [$controller, 'notImplemented'])->name($namePrefix . 'auth.session');
-            Route::post('auth/logout', [$controller, 'notImplemented'])->name($namePrefix . 'auth.logout');
+            Route::get('auth/session', [AuthController::class, 'session'])->name($namePrefix . 'auth.session');
+            Route::post('auth/logout', [AuthController::class, 'logout'])->name($namePrefix . 'auth.logout');
             Route::get('account', [$controller, 'notImplemented'])->name($namePrefix . 'account.get');
             Route::get('entitlement', [$controller, 'notImplemented'])->name($namePrefix . 'entitlement.get');
             Route::get('plans', [$controller, 'notImplemented'])->name($namePrefix . 'plans.list');

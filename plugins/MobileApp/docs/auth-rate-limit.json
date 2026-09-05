@@ -1,0 +1,17 @@
+{
+  "taskId": "TASK-022",
+  "cachePrefix": "mobile_app:auth_throttle",
+  "windowSeconds": 600,
+  "limits": {
+    "login": 30,
+    "register": 10,
+    "email-code": 8,
+    "password-reset": 8
+  },
+  "plusOfficial": ["PASSWORD_ERROR_LIMIT", "REGISTER_IP_RATE_LIMIT", "FORGET_REQUEST_LIMIT", "LAST_SEND_EMAIL_VERIFY_TIMESTAMP"],
+  "captcha": "CaptchaService when captcha_enable",
+  "enumeration": {
+    "login": "AUTH_CREDENTIALS_INVALID for unknown or wrong password",
+    "passwordResetUnknownEmail": "AUTH_EMAIL_CODE_INVALID, same as wrong code"
+  }
+}

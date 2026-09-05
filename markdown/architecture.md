@@ -332,3 +332,22 @@
 - 阶段 TASK-020 | `tests/task-020/**` | `MobileApp` | 隔离启动状态、内核粒度和批准规则测试。
 - 阶段 TASK-020 | `plugins/MobileApp/Providers/PluginServiceProvider.php` | `MobileApp` | 增加 MobileApiException 渲染为移动信封，避免官方 Handler 吞掉机器码。
 
+## 2026-09-05 TASK-021 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-021 | `plugins/MobileApp/Adapters/AuthAdapter.php` | `MobileApp` | 复用 RegisterService/LoginService/AuthService；登录只输出 Sanctum Bearer；重置后撤销全部会话。
+- 阶段 TASK-021 | `plugins/MobileApp/Support/AuthErrorMapper.php` | `MobileApp` | 官方认证失败到稳定机器码，不解析客户端语言。
+- 阶段 TASK-021 | `plugins/MobileApp/Support/MobileErrorCatalog.php` | `MobileApp` | 增补 AUTH_EMAIL_RESTRICTED、AUTH_INVITE_*、AUTH_EMAIL_EXISTS、AUTH_EMAIL_CODE_INVALID。
+- 阶段 TASK-021 | `plugins/MobileApp/Adapters/XboardAdapterBoundary.php` | `MobileApp` | 禁止用订阅令牌或 findUserByBearerToken 作为移动会话。
+- 阶段 TASK-021 | `plugins/MobileApp/docs/auth-rule-mapping.json` | `MobileApp` | 认证规则映射表。
+- 阶段 TASK-021 | `plugins/MobileApp/docs/session-security.md` | `MobileApp` | 会话安全说明。
+- 阶段 TASK-021 | `tests/task-021/**` | `MobileApp` | 对照官方资格、Bearer/订阅令牌、重置撤会话与日志脱敏。
+
+## 2026-09-05 TASK-022 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-022 | `plugins/MobileApp/Controllers/AuthController.php` | `MobileApp` | 移动注册、登录、邮箱验证码、密码重置、会话和退出。
+- 阶段 TASK-022 | `plugins/MobileApp/Support/MobileAuthThrottle.php` | `MobileApp` | 公开认证接口每 IP 限流。
+- 阶段 TASK-022 | `plugins/MobileApp/Adapters/AuthAdapter.php` | `MobileApp` | 增加发码、会话快照、退出当前 Sanctum 令牌。
+- 阶段 TASK-022 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 认证路由从骨架改为 AuthController。
+- 阶段 TASK-022 | `plugins/MobileApp/docs/auth-rate-limit.json` | `MobileApp` | 限流配额与枚举策略。
+- 阶段 TASK-022 | `tests/task-022/**` | `MobileApp` | v0/v1 全流程、验证码、封禁、超频、枚举和脱敏测试。
+
