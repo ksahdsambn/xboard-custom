@@ -12,6 +12,7 @@ use Plugin\MobileApp\Exceptions\MobileApiException;
 use Plugin\MobileApp\Models\AccountLink;
 use Plugin\MobileApp\Models\PlayProduct;
 use Plugin\MobileApp\Models\PurchaseToken;
+use Plugin\MobileApp\Support\DownstreamRetryPolicy;
 use Plugin\MobileApp\Support\MobileLogRedactor;
 use Plugin\MobileApp\Support\MobileRequestId;
 
@@ -105,7 +106,20 @@ final class PlayPurchaseService
                 }
             }
 
-            $snapshot = $this->developer->getSubscription(self::PACKAGE, $token);
+            try {
+                $snapshot = DownstreamRetryPolicy::run(
+                    'play_developer_lookup',
+                    fn () => $this->developer->getSubscription(self::PACKAGE, $token)
+                );
+            } catch (MobileApiException $exception) {
+                $row->last_error = $exception->errorCode;
+                $row->save();
+                return [
+                    'ledgerId' => (int) $row->id,
+                    'playStatus' => 'unavailable',
+                    'errorCode' => $exception->errorCode,
+                ];
+            }
             if ($snapshot === null
                 || ($snapshot['packageName'] ?? '') !== self::PACKAGE
                 || (($apiProduct = (string) ($snapshot['productId'] ?? '')) !== '' && $productId !== '' && $apiProduct !== $productId)
@@ -171,6 +185,9 @@ final class PlayPurchaseService
         });
         if (($result['errorCode'] ?? null) === 'PURCHASE_INVALID') {
             throw new MobileApiException('PURCHASE_INVALID', 400);
+        }
+        if (($result['errorCode'] ?? null) === 'DOWNSTREAM_UNAVAILABLE') {
+            throw new MobileApiException('DOWNSTREAM_UNAVAILABLE', 503);
         }
         if ($result['playStatus'] === 'pending') {
             throw new MobileApiException('PURCHASE_PENDING', 409);

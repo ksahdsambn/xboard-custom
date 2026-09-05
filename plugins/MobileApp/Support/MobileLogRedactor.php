@@ -28,6 +28,12 @@ final class MobileLogRedactor
         'publickey',
         'shortid',
         'uuid',
+        'profile',
+        'dnsquery',
+        'dnshistory',
+        'trafficpayload',
+        'trafficcontent',
+        'rawprofile',
     ];
 
     /** @var list<array<string, mixed>> */
@@ -47,6 +53,9 @@ final class MobileLogRedactor
         }
         if (is_string($value) && preg_match('/Bearer\s+\S+/i', $value)) {
             return preg_replace('/Bearer\s+\S+/i', 'Bearer [redacted]', $value);
+        }
+        if (is_string($value) && preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----/', $value)) {
+            return '[redacted]';
         }
         return $value;
     }
@@ -76,6 +85,30 @@ final class MobileLogRedactor
 
     private static function isSensitiveKey(string $key): bool
     {
-        return in_array(strtolower($key), self::SENSITIVE_KEYS, true);
+        $normalized = strtolower((string) preg_replace('/[^a-z0-9]/i', '', $key));
+        return in_array($normalized, self::SENSITIVE_KEYS, true);
+    }
+
+    public static function encodedContainsSensitive(string $encoded, array $secrets = []): bool
+    {
+        if (preg_match('/bearer\s+(?!\[redacted\])\S+/i', $encoded)) {
+            return true;
+        }
+        if (preg_match('/-----BEGIN [A-Z ]*PRIVATE KEY-----/', $encoded)) {
+            return true;
+        }
+        $lower = strtolower($encoded);
+        foreach (['realityprivatekey', '"purchase_token":"', '"purchasetoken":"'] as $needle) {
+            if (str_contains($lower, $needle) && !str_contains($lower, $needle . '[redacted]')) {
+                return true;
+            }
+        }
+        foreach ($secrets as $secret) {
+            $secret = trim((string) $secret);
+            if ($secret !== '' && str_contains($encoded, $secret)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

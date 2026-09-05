@@ -1,0 +1,18 @@
+{
+  "taskId": "TASK-035",
+  "evidenceClass": "non-production-simulation",
+  "formalAcceptanceClaimed": false,
+  "penetrationTestClaimed": false,
+  "realGooglePlayClaimed": false,
+  "review": {
+    "dependencies": "MobileApp uses official Xboard Laravel/Sanctum/Eloquent; no new Composer packages; no remote code loaders.",
+    "configuration": "No production secrets in plugin source. Play adapter is a non-production fixture. HTTPS is required in production.",
+    "keyManagement": "Sanctum tokens issued by official AuthService. Plugin stores only purchase token hashes and opaque identifiers.",
+    "webRisks": "Parameterized Eloquent queries; opaque IDs compared with hash_equals; request size, pagination, rate limit, replay uniqueness and RTDN HMAC are enforced."
+  },
+  "findings": {
+    "p0": 0,
+    "high": 0,
+    "sensitiveScanHits": 0
+  }
+}

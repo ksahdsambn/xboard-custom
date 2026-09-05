@@ -125,6 +125,11 @@ final class EntitlementProjectionService
                 'playStatus' => $status,
                 'grantable' => $grantable,
                 'projectionId' => $row->id,
+                'entitlementDiff' => [
+                    'fromExpire' => $baseline['expired_at'],
+                    'toExpire' => $this->intOrNull($locked->expired_at),
+                    'grantable' => $grantable,
+                ],
             ]);
             return $row;
         });

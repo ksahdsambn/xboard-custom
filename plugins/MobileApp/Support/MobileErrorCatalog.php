@@ -57,6 +57,10 @@ final class MobileErrorCatalog
         'PLAY_PRODUCT_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
         'PLAY_PRODUCT_DUPLICATE' => ['http' => [409], 'defaultHttp' => 409, 'reLogin' => false],
         'INTERNAL_ERROR' => ['http' => [500], 'defaultHttp' => 500, 'reLogin' => false],
+        'HTTPS_REQUIRED' => ['http' => [403], 'defaultHttp' => 403, 'reLogin' => false],
+        'REQUEST_TOO_LARGE' => ['http' => [413], 'defaultHttp' => 413, 'reLogin' => false],
+        'PAGINATION_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
+        'DOWNSTREAM_UNAVAILABLE' => ['http' => [503], 'defaultHttp' => 503, 'reLogin' => false],
     ];
 
     public const MESSAGES = [
@@ -99,6 +103,10 @@ final class MobileErrorCatalog
         'PLAY_PRODUCT_INVALID' => ['zh' => 'Play 商品映射无效', 'en' => 'Play product mapping is invalid.'],
         'PLAY_PRODUCT_DUPLICATE' => ['zh' => '该 Play 商品已在当前环境映射', 'en' => 'This Play product is already mapped in the current environment.'],
         'INTERNAL_ERROR' => ['zh' => '服务暂时不可用', 'en' => 'Service is temporarily unavailable.'],
+        'HTTPS_REQUIRED' => ['zh' => '必须使用 HTTPS', 'en' => 'HTTPS is required.'],
+        'REQUEST_TOO_LARGE' => ['zh' => '请求过大', 'en' => 'Request is too large.'],
+        'PAGINATION_INVALID' => ['zh' => '分页参数无效', 'en' => 'Pagination is invalid.'],
+        'DOWNSTREAM_UNAVAILABLE' => ['zh' => '下游服务暂时不可用', 'en' => 'Downstream service is temporarily unavailable.'],
     ];
 
     public static function exists(string $code): bool

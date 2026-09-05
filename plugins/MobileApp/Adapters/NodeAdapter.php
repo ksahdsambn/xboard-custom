@@ -82,11 +82,14 @@ final class NodeAdapter
             if (!hash_equals($candidateId, $opaqueNodeId)) {
                 continue;
             }
-            if ($this->filter->rejectReason($server) !== null) {
+            $reason = $this->filter->rejectReason($server);
+            if ($reason !== null) {
+                MobileLogRedactor::error('profile_rejected', ['profileRejectReason' => $reason]);
                 return null;
             }
             return self::withoutServerSecrets($server);
         }
+        MobileLogRedactor::error('profile_rejected', ['profileRejectReason' => 'unauthorized_or_unknown']);
         return null;
     }
 

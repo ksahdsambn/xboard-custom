@@ -1,0 +1,27 @@
+{
+  "taskId": "TASK-035",
+  "httpsRequiredInProduction": true,
+  "timeoutSeconds": 10,
+  "maxRequestBytes": 65536,
+  "maxRtdnBytes": 131072,
+  "downstreamMaxAttempts": 3,
+  "rateLimits": {
+    "windowSeconds": 60,
+    "profile": 30,
+    "purchase": 30,
+    "deletion": 10,
+    "rtdn": 60,
+    "diagnostic": 20,
+    "default": 120
+  },
+  "leastPrivilege": {
+    "auth": "public+throttle",
+    "profile": "user",
+    "purchase": "user+startup:purchase",
+    "rtdn": "mobile.google.rtdn",
+    "deletion": "user",
+    "diagnostic": "user",
+    "securityAudits": "admin"
+  },
+  "formalAcceptanceClaimed": false
+}

@@ -10,6 +10,8 @@ use Plugin\MobileApp\Exceptions\MobileApiException;
 use Plugin\MobileApp\Http\Middleware\MobileEnvelopeMiddleware;
 use Plugin\MobileApp\Http\Middleware\MobileStartupGate;
 use Plugin\MobileApp\Http\Middleware\VerifyGoogleRtdn;
+use Plugin\MobileApp\Support\MobileRateLimit;
+use Plugin\MobileApp\Support\MobileSecurityGuard;
 use Plugin\MobileApp\Support\MobileEnvelope;
 use Plugin\MobileApp\Support\MobileLocale;
 
@@ -21,6 +23,8 @@ class PluginServiceProvider extends ServiceProvider
         $this->app['router']->aliasMiddleware('mobile.startup', MobileStartupGate::class);
         $this->app['router']->aliasMiddleware('mobile.google.rtdn', VerifyGoogleRtdn::class);
         $this->app->instance('mobile_app.provider', true);
+        $this->app->instance('mobile_app.security_guard', MobileSecurityGuard::class);
+        $this->app->instance('mobile_app.rate_limit', MobileRateLimit::class);
     }
 
     public function boot(): void

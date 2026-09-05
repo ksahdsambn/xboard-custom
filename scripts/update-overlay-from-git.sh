@@ -52,7 +52,7 @@ if ! git merge-base --is-ancestor "${current_head}" "${remote_head}"; then
   exit 1
 fi
 
-runtime_changes="$(git diff --name-only "${current_head}" "${remote_head}" -- plugins theme)"
+runtime_changes="$(git diff --name-only "${current_head}" "${remote_head}" -- plugins theme plugins/MobileApp)"
 needs_deploy="0"
 if [[ -n "${runtime_changes}" || "${FORCE_DEPLOY}" == "1" ]]; then
   needs_deploy="1"

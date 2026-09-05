@@ -13,7 +13,9 @@ use Plugin\MobileApp\Support\MobileErrorCatalog;
 use Plugin\MobileApp\Support\MobileErrorMapper;
 use Plugin\MobileApp\Support\MobileLocale;
 use Plugin\MobileApp\Support\MobileLogRedactor;
+use Plugin\MobileApp\Support\MobileObservability;
 use Plugin\MobileApp\Support\MobileRequestId;
+use Plugin\MobileApp\Support\MobileSecurityGuard;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -24,8 +26,10 @@ class MobileEnvelopeMiddleware
         $requestId = MobileRequestId::bind($request);
         $locale = MobileLocale::resolve($request);
         $request->attributes->set('mobile_locale', $locale);
+        MobileObservability::start($request);
 
         try {
+            MobileSecurityGuard::enforce($request);
             if (self::allowsFixture() && $request->headers->has('X-Mobile-Error-Fixture')) {
                 $code = (string) $request->headers->get('X-Mobile-Error-Fixture');
                 $httpHeader = $request->headers->get('X-Mobile-Error-Http');
@@ -33,23 +37,29 @@ class MobileEnvelopeMiddleware
                 throw new MobileApiException($code, $http);
             }
             $response = $next($request);
-            return $this->finalize($request, $response, $requestId, $locale);
+            return $this->observe($request, $this->finalize($request, $response, $requestId, $locale));
         } catch (MobileApiException $exception) {
-            return $this->respond($exception->errorCode, $exception->httpStatus(), $locale, $requestId, $exception->displayMessage($locale));
+            return $this->observe($request, $this->respond($exception->errorCode, $exception->httpStatus(), $locale, $requestId, $exception->displayMessage($locale)));
         } catch (AuthenticationException $exception) {
             MobileLogRedactor::error('auth_exception', ['type' => $exception::class], $request);
-            return $this->respond('AUTH_SESSION_INVALID', 401, $locale, $requestId);
+            return $this->observe($request, $this->respond('AUTH_SESSION_INVALID', 401, $locale, $requestId));
         } catch (ApiException $exception) {
             $mapped = MobileErrorMapper::fromThrowable($exception, $request);
             MobileLogRedactor::error('mapped_api_exception', [
                 'type' => $exception::class,
                 'errorCode' => $mapped['errorCode'],
             ], $request);
-            return $this->respond($mapped['errorCode'], $mapped['http'], $locale, $requestId);
+            return $this->observe($request, $this->respond($mapped['errorCode'], $mapped['http'], $locale, $requestId));
         } catch (Throwable $exception) {
             MobileLogRedactor::error('unhandled', ['type' => $exception::class], $request);
-            return $this->respond('INTERNAL_ERROR', 500, $locale, $requestId);
+            return $this->observe($request, $this->respond('INTERNAL_ERROR', 500, $locale, $requestId));
         }
+    }
+
+    private function observe(Request $request, Response $response): Response
+    {
+        MobileObservability::record($request, $response);
+        return $response;
     }
 
     public static function allowsFixture(?string $env = null): bool

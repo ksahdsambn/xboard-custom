@@ -454,4 +454,33 @@
 - 阶段 TASK-034 | `plugins/MobileApp/docs/play-web-capability-matrix.md` | `MobileApp` | 能力矩阵说明。
 - 阶段 TASK-034 | `tests/task-034/**` | `MobileApp` | Play 各态跳过、Web 不拦截、目录禁字段测试。
 
+## 2026-09-06 TASK-035 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-035 | `plugins/MobileApp/Support/MobileSecurityGuard.php` | `MobileApp` | HTTPS、请求大小、非法分页。
+- 阶段 TASK-035 | `plugins/MobileApp/Support/MobileRateLimit.php` | `MobileApp` | 操作级速率限制。
+- 阶段 TASK-035 | `plugins/MobileApp/Support/DownstreamRetryPolicy.php` | `MobileApp` | 下游重试上限。
+- 阶段 TASK-035 | `plugins/MobileApp/Support/MobileObservability.php` | `MobileApp` | 结构化指标。
+- 阶段 TASK-035 | `plugins/MobileApp/Services/SecurityAuditService.php` | `MobileApp` | 六类操作脱敏审计。
+- 阶段 TASK-035 | `plugins/MobileApp/Models/SecurityAudit.php` | `MobileApp` | 安全审计模型。
+- 阶段 TASK-035 | `plugins/MobileApp/Controllers/DiagnosticsController.php` | `MobileApp` | 用户诊断快照。
+- 阶段 TASK-035 | `plugins/MobileApp/Controllers/AdminSecurityAuditController.php` | `MobileApp` | 管理员审计列表。
+- 阶段 TASK-035 | `plugins/MobileApp/database/migrations/2026_09_06_250000_create_mobile_app_security_audits_table.php` | `MobileApp` | 安全审计表。
+- 阶段 TASK-035 | `plugins/MobileApp/docs/security-*.json|md` | `MobileApp` | 安全基线、脱敏规则和开发审查。
+- 阶段 TASK-035 | `tests/task-035/**` | `MobileApp` | 未授权、越权、重放、超频、注入、脱敏测试。
+
+## 2026-09-06 TASK-036 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-036 | `scripts/deploy-overlay.sh` | overlay | 同步 MobileApp 并在失败时中止。
+- 阶段 TASK-036 | `scripts/update-official-from-git.sh` | overlay | 不可变镜像摘要、三身份记录、禁止 latest。
+- 阶段 TASK-036 | `scripts/update-overlay-from-git.sh` | overlay | 运行时变更检测包含 MobileApp。
+- 阶段 TASK-036 | `plugins/MobileApp/bin/post-deploy.php` | `MobileApp` | 安装/升级/启用/健康检查。
+- 阶段 TASK-036 | `plugins/MobileApp/Commands/HealthCommand.php` | `MobileApp` | v0/v1 路由与表健康检查。
+- 阶段 TASK-036 | `plugins/MobileApp/docs/overlay-update-flow.*` | `MobileApp` | overlay 与官方更新流程。
+- 阶段 TASK-036 | `tests/task-036/**` | `MobileApp` | 安装、重复部署、升级、健康失败中止测试。
+
+## 2026-09-06 TASK-037 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-037 | `plugins/MobileApp/docs/server-e2e-baseline.*` | `MobileApp` | 服务端端到端与兼容基线。
+- 阶段 TASK-037 | `tests/task-037/**` | `MobileApp` | v0/v1 全旅程、幂等、降级和 Web 回归隔离测试。
+
 

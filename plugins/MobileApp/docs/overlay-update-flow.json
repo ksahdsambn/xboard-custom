@@ -1,0 +1,10 @@
+{
+  "taskId": "TASK-036",
+  "allowedPluginDirs": ["StripePayment", "BepusdtPayment", "WalletCenter", "MobileApp"],
+  "healthCommand": "mobile-app:health",
+  "postDeploy": "plugins/MobileApp/bin/post-deploy.php",
+  "forbiddenTags": ["latest", "main", "master"],
+  "identities": ["xboardMaster", "xboardCompose", "imageDigest"],
+  "failureAbortsDeploy": true,
+  "formalAcceptanceClaimed": false
+}

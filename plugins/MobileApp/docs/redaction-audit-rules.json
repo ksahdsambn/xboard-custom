@@ -1,0 +1,30 @@
+{
+  "taskId": "TASK-035",
+  "observabilityFields": [
+    "requestId",
+    "errorCode",
+    "latencyMs",
+    "route",
+    "operation",
+    "outcome",
+    "purchaseVerification",
+    "entitlementDiff",
+    "profileRejectReason"
+  ],
+  "forbiddenInLogs": [
+    "token",
+    "sanctumToken",
+    "purchaseToken",
+    "authorization",
+    "password",
+    "uuid",
+    "userId",
+    "privateKey",
+    "realityPrivateKey",
+    "protocolSettings",
+    "dnsQuery",
+    "trafficPayload",
+    "profile"
+  ],
+  "auditOperations": ["auth", "profile", "purchase", "rtdn", "deletion", "diagnostic"]
+}

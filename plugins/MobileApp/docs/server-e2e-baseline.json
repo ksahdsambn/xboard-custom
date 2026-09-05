@@ -1,0 +1,7 @@
+{
+  "taskId": "TASK-037",
+  "supportedMobileApiVersions": [0, 1],
+  "maxJourneyLatencyMs": 10000,
+  "duplicateEntitlementForbidden": true,
+  "formalAcceptanceClaimed": false
+}

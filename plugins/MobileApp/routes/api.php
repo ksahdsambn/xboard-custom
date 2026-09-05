@@ -6,8 +6,10 @@ use Plugin\MobileApp\Controllers\AdminCompatController;
 use Plugin\MobileApp\Controllers\AdminPlayProductController;
 use Plugin\MobileApp\Controllers\AuthController;
 use Plugin\MobileApp\Controllers\BootstrapController;
+use Plugin\MobileApp\Controllers\AdminSecurityAuditController;
 use Plugin\MobileApp\Controllers\DeletionController;
 use Plugin\MobileApp\Controllers\DeviceController;
+use Plugin\MobileApp\Controllers\DiagnosticsController;
 use Plugin\MobileApp\Controllers\LegalController;
 use Plugin\MobileApp\Controllers\NodeController;
 use Plugin\MobileApp\Controllers\NoticeController;
@@ -53,6 +55,7 @@ $registerVersion = static function (string $version): void {
             Route::post('tickets/{ticketId}/replies', [TicketController::class, 'reply'])->name($namePrefix . 'tickets.reply');
             Route::post('tickets/{ticketId}/close', [TicketController::class, 'close'])->name($namePrefix . 'tickets.close');
             Route::put('devices', [DeviceController::class, 'upsert'])->name($namePrefix . 'devices.register');
+            Route::get('diagnostics', [DiagnosticsController::class, 'show'])->name($namePrefix . 'diagnostics.get');
             Route::middleware('mobile.startup:purchase')->group(function () use ($namePrefix, $controller): void {
                 Route::post('play/purchases', [PlayPurchaseController::class, 'submit'])->name($namePrefix . 'play.purchase.submit');
                 Route::post('play/purchases/restore', [PlayPurchaseController::class, 'restore'])->name($namePrefix . 'play.purchase.restore');
@@ -68,6 +71,7 @@ $registerVersion = static function (string $version): void {
             Route::get('compat', [AdminCompatController::class, 'show'])->name($namePrefix . 'admin.compat.get');
             Route::put('compat', [AdminCompatController::class, 'update'])->name($namePrefix . 'admin.compat.update');
             Route::get('rtdn-events', [AdminRtdnController::class, 'index'])->name($namePrefix . 'admin.rtdnEvents.list');
+            Route::get('security-audits', [AdminSecurityAuditController::class, 'index'])->name($namePrefix . 'admin.securityAudits.list');
         });
 
         Route::post('platform/google/rtdn', [RtdnController::class, 'handle'])

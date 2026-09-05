@@ -8,7 +8,10 @@ HORIZON_SERVICE="${HORIZON_SERVICE-horizon}"
 THEME_NAME="${THEME_NAME:-XboardCustom}"
 THEME_TARGET_ROOT="${THEME_TARGET_ROOT:-storage/theme}"
 DRY_RUN="${DRY_RUN:-0}"
+SKIP_COMPOSE="${SKIP_COMPOSE:-0}"
+SKIP_POST_DEPLOY="${SKIP_POST_DEPLOY:-0}"
 COMPOSE_BIN="${COMPOSE_BIN:-docker compose}"
+ALLOWED_PLUGINS=(StripePayment BepusdtPayment WalletCenter MobileApp)
 
 if [[ -z "${OFFICIAL_ROOT}" ]]; then
   echo "OFFICIAL_ROOT is required, for example: OFFICIAL_ROOT=/opt/xboard-official"
@@ -26,8 +29,11 @@ if [[ ! -d "${OFFICIAL_ROOT}" ]]; then
 fi
 
 if ! command -v rsync >/dev/null 2>&1; then
-  echo "rsync is required but not installed"
-  exit 1
+  if [[ "${DRY_RUN}" != "1" && "${SKIP_COMPOSE}" != "1" ]]; then
+    echo "rsync is required for overlay deploy so extra files are deleted"
+    exit 1
+  fi
+  echo "rsync not found; test/dry-run overlay will copy with cp -a"
 fi
 
 read -r -a COMPOSE_CMD <<< "${COMPOSE_BIN}"
@@ -49,7 +55,26 @@ sync_dir() {
   fi
 
   echo "Sync ${source_dir} -> ${target_dir}"
-  rsync "${rsync_args[@]}" "${source_dir}/" "${target_dir}/"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync "${rsync_args[@]}" "${source_dir}/" "${target_dir}/"
+  else
+    if [[ "${DRY_RUN}" == "1" ]]; then
+      echo "Dry run without rsync: would copy ${source_dir} -> ${target_dir}"
+      return 0
+    fi
+    mkdir -p "${target_dir}"
+    cp -a "${source_dir}/." "${target_dir}/"
+  fi
+}
+
+assert_overlay_allowlist() {
+  local plugin
+  for plugin in "${ALLOWED_PLUGINS[@]}"; do
+    if [[ ! -d "${CUSTOM_ROOT}/plugins/${plugin}" ]]; then
+      echo "Required overlay plugin missing in custom repo: ${plugin}"
+      exit 1
+    fi
+  done
 }
 
 compose_services() {
@@ -137,28 +162,56 @@ refresh_theme_if_possible() {
   )
 }
 
+assert_overlay_allowlist
 resolve_web_service
 
-sync_dir "${CUSTOM_ROOT}/plugins/StripePayment" "${OFFICIAL_ROOT}/plugins/StripePayment"
-sync_dir "${CUSTOM_ROOT}/plugins/BepusdtPayment" "${OFFICIAL_ROOT}/plugins/BepusdtPayment"
-sync_dir "${CUSTOM_ROOT}/plugins/WalletCenter" "${OFFICIAL_ROOT}/plugins/WalletCenter"
+for plugin in "${ALLOWED_PLUGINS[@]}"; do
+  sync_dir "${CUSTOM_ROOT}/plugins/${plugin}" "${OFFICIAL_ROOT}/plugins/${plugin}"
+done
 sync_dir "${CUSTOM_ROOT}/theme/${THEME_NAME}" "${OFFICIAL_ROOT}/${THEME_TARGET_ROOT}/${THEME_NAME}"
 cleanup_legacy_theme_path
 
+if [[ -d "${OFFICIAL_ROOT}/.git" ]]; then
+  core_diff="$(git -C "${OFFICIAL_ROOT}" diff --name-only -- app routes bootstrap composer.lock composer.json || true)"
+  if [[ -n "${core_diff}" ]]; then
+    echo "Overlay must not modify official core files:"
+    printf '%s\n' "${core_diff}"
+    exit 1
+  fi
+fi
+
 if [[ "${DRY_RUN}" == "1" ]]; then
-  echo "Dry run completed"
+  echo "Dry run completed; MobileApp would be installed, migrated, enabled and health-checked"
   exit 0
 fi
 
-restart_service_if_exists "${WEB_SERVICE}"
-restart_service_if_exists "${HORIZON_SERVICE}"
-refresh_theme_if_possible
+if [[ "${SKIP_COMPOSE}" != "1" ]]; then
+  restart_service_if_exists "${WEB_SERVICE}"
+  restart_service_if_exists "${HORIZON_SERVICE}"
+  refresh_theme_if_possible
+fi
+
+if [[ "${SKIP_POST_DEPLOY}" != "1" ]]; then
+  echo "Run MobileApp post-deploy install/upgrade/enable/health"
+  if [[ "${SKIP_COMPOSE}" == "1" ]]; then
+    php "${OFFICIAL_ROOT}/plugins/MobileApp/bin/post-deploy.php"
+  else
+    if [[ -z "${WEB_SERVICE}" ]] || ! has_compose_service "${WEB_SERVICE}"; then
+      echo "Web service missing; cannot run MobileApp health check"
+      exit 1
+    fi
+    (
+      cd "${OFFICIAL_ROOT}"
+      "${COMPOSE_CMD[@]}" exec -T "${WEB_SERVICE}" php plugins/MobileApp/bin/post-deploy.php
+    )
+  fi
+fi
 
 cat <<EOF
 Overlay deploy completed.
 
 Next checks:
-1. Open admin plugin list and confirm stripe_payment, bepusdt_payment, wallet_center are installed and enabled.
-2. If plugin config.json version changed, run plugin upgrade from the admin panel.
+1. Confirm stripe_payment, bepusdt_payment, wallet_center and mobile_app are installed and enabled.
+2. Confirm php artisan mobile-app:health returns ok=true for v0 and v1 routes.
 3. Open theme management and confirm ${THEME_NAME} is still the active theme.
 EOF

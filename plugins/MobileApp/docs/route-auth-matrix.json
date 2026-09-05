@@ -40,7 +40,8 @@
         "POST /play/purchases/restore",
         "POST /account/deletion/preview",
         "POST /account/deletion",
-        "GET /account/deletion"
+        "GET /account/deletion",
+        "GET /diagnostics"
       ]
     },
     "admin": {
@@ -50,7 +51,8 @@
         "PUT /admin/play-products",
         "GET /admin/compat",
         "PUT /admin/compat",
-        "GET /admin/rtdn-events"
+        "GET /admin/rtdn-events",
+        "GET /admin/security-audits"
       ]
     },
     "google_platform": {
