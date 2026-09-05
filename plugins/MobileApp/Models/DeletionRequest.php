@@ -14,5 +14,6 @@ class DeletionRequest extends Model
         'play_subscription_warning_ack' => 'boolean',
         'retain_until' => 'datetime',
         'executed_at' => 'datetime',
+        'user_id' => 'integer',
     ];
 }

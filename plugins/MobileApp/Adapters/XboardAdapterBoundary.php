@@ -21,5 +21,8 @@ final class XboardAdapterBoundary
         'passthrough official Notice model fields or share notice read state across users',
         'expose other users tickets or fake attachment upload capability',
         'collect advertising or hardware identifiers or grant entitlement from device registration',
+        'treat logout or disable as account deletion',
+        'cancel Play subscriptions when deleting an Xboard account',
+        'keep sessions, email or Profile access after account deletion execute',
     ];
 }

@@ -1,0 +1,56 @@
+{
+  "taskId": "TASK-029",
+  "evidenceClass": "non-production-simulation",
+  "formalAcceptanceClaimed": false,
+  "retentionYears": 7,
+  "retentionBasis": "Isolated Play ledger and Xboard order rows retained for refund, tax and dispute audit after personal identifiers are anonymized. Development policy, not a production legal opinion.",
+  "playSubscriptionsCancelledByDeletion": false,
+  "playSubscriptionManagementUrl": "https://play.google.com/store/account/subscriptions",
+  "rows": [
+    {
+      "data": "email, telegram_id, password, uuid, subscribe token",
+      "action": "anonymize",
+      "reason": "personal identifiers not required after deletion"
+    },
+    {
+      "data": "mobile_app_devices, mobile_app_notice_reads",
+      "action": "delete",
+      "reason": "device and read-state are not legally required"
+    },
+    {
+      "data": "v2_ticket subject and v2_ticket_message body",
+      "action": "anonymize and close",
+      "reason": "support text is personal; closed rows remain without content"
+    },
+    {
+      "data": "Sanctum personal access tokens",
+      "action": "revoke all",
+      "reason": "deleted accounts must not keep API sessions"
+    },
+    {
+      "data": "plan_id, group_id, expired_at, transfer_enable, banned",
+      "action": "clear grants and ban",
+      "reason": "block Profile, nodes and login"
+    },
+    {
+      "data": "v2_order",
+      "action": "retain isolated",
+      "reason": "transaction record; no email column; user email already anonymized"
+    },
+    {
+      "data": "mobile_app_purchase_tokens, mobile_app_entitlement_projections, mobile_app_rtdn_events",
+      "action": "retain isolated",
+      "reason": "Play audit and refund window; tokens stored as SHA-256 only"
+    },
+    {
+      "data": "mobile_app_account_links",
+      "action": "revoke, keep row",
+      "reason": "preserve unique obfuscated Play account binding without active link"
+    },
+    {
+      "data": "mobile_app_deletion_requests",
+      "action": "retain with retain_until",
+      "reason": "deletion audit"
+    }
+  ]
+}

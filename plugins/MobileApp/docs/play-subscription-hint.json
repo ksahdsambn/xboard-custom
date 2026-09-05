@@ -1,0 +1,7 @@
+{
+  "taskId": "TASK-029",
+  "cancelsAutomatically": false,
+  "playSubscriptionWarning": "Deleting the Xboard account does not cancel Play subscriptions. Manage or cancel them in Google Play.",
+  "playSubscriptionManagementUrl": "https://play.google.com/store/account/subscriptions",
+  "mustAcknowledgeBeforeExecute": true
+}

@@ -384,4 +384,17 @@
 - 阶段 TASK-025 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 Profile 接到 ProfileController；Play 购买仍为骨架。
 - 阶段 TASK-025 | `tests/task-025/**` | `MobileApp` | 来源核对、缺字段、Schema、越权/隐藏/encryption/过期和脱敏隔离测试。
 
+## 2026-09-06 TASK-029 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-029 | `plugins/MobileApp/Services/AccountDeletionService.php` | `MobileApp` | 删号预览、密码再确认、执行、匿名化个人数据、撤销全部会话、隔离保留交易记录。
+- 阶段 TASK-029 | `plugins/MobileApp/Controllers/DeletionController.php` | `MobileApp` | 删号预览、提交和状态 HTTP。
+- 阶段 TASK-029 | `plugins/MobileApp/docs/deletion-retention-matrix.json` | `MobileApp` | 机器可读删除与保留矩阵。
+- 阶段 TASK-029 | `plugins/MobileApp/docs/deletion-retention-matrix.md` | `MobileApp` | 人类可读删除与保留矩阵。
+- 阶段 TASK-029 | `plugins/MobileApp/docs/play-subscription-hint.json` | `MobileApp` | Play 订阅不会因删号自动取消。
+- 阶段 TASK-029 | `plugins/MobileApp/docs/play-subscription-hint.md` | `MobileApp` | Play 订阅管理提示。
+- 阶段 TASK-029 | `plugins/MobileApp/docs/legal.json` | `MobileApp` | 增补 Play 订阅管理 URL。
+- 阶段 TASK-029 | `plugins/MobileApp/Support/MobileErrorCatalog.php` | `MobileApp` | 增加 DELETION_CONFIRMATION_INVALID 与 DELETION_PLAY_WARNING_REQUIRED。
+- 阶段 TASK-029 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 删号接到 DeletionController；Play 购买仍为骨架。
+- 阶段 TASK-029 | `tests/task-029/**` | `MobileApp` | 申请、身份失败、确认、重复执行、删除后不可用和隔离保留测试。
+
 

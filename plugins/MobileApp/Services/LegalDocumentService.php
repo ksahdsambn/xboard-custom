@@ -26,7 +26,8 @@ final class LegalDocumentService
         return $this->all()['accountDeletion'] ?? [
             'version' => 'deletion-v1',
             'url' => '',
-            'playSubscriptionWarning' => 'Deleting the Xboard account does not cancel Play subscriptions.',
+            'playSubscriptionWarning' => 'Deleting the Xboard account does not cancel Play subscriptions. Manage or cancel them in Google Play.',
+            'playSubscriptionManagementUrl' => 'https://play.google.com/store/account/subscriptions',
         ];
     }
 

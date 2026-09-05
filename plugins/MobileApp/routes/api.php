@@ -5,6 +5,7 @@ use Plugin\MobileApp\Controllers\AccountController;
 use Plugin\MobileApp\Controllers\AdminCompatController;
 use Plugin\MobileApp\Controllers\AuthController;
 use Plugin\MobileApp\Controllers\BootstrapController;
+use Plugin\MobileApp\Controllers\DeletionController;
 use Plugin\MobileApp\Controllers\DeviceController;
 use Plugin\MobileApp\Controllers\LegalController;
 use Plugin\MobileApp\Controllers\NodeController;
@@ -52,9 +53,9 @@ $registerVersion = static function (string $version): void {
                 Route::post('play/purchases', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.submit');
                 Route::post('play/purchases/restore', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.restore');
             });
-            Route::post('account/deletion/preview', [$controller, 'notImplemented'])->name($namePrefix . 'account.deletion.preview');
-            Route::post('account/deletion', [$controller, 'notImplemented'])->name($namePrefix . 'account.deletion.submit');
-            Route::get('account/deletion', [$controller, 'notImplemented'])->name($namePrefix . 'account.deletion.get');
+            Route::post('account/deletion/preview', [DeletionController::class, 'preview'])->name($namePrefix . 'account.deletion.preview');
+            Route::post('account/deletion', [DeletionController::class, 'submit'])->name($namePrefix . 'account.deletion.submit');
+            Route::get('account/deletion', [DeletionController::class, 'show'])->name($namePrefix . 'account.deletion.get');
         });
 
         Route::middleware(['admin', 'log'])->prefix('admin')->group(function () use ($namePrefix, $controller): void {

@@ -52,6 +52,8 @@ final class MobileErrorCatalog
         'TICKET_OPEN_EXISTS' => ['http' => [409], 'defaultHttp' => 409, 'reLogin' => false],
         'TICKET_ALREADY_CLOSED' => ['http' => [409], 'defaultHttp' => 409, 'reLogin' => false],
         'DEVICE_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
+        'DELETION_CONFIRMATION_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
+        'DELETION_PLAY_WARNING_REQUIRED' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
         'INTERNAL_ERROR' => ['http' => [500], 'defaultHttp' => 500, 'reLogin' => false],
     ];
 
@@ -90,6 +92,8 @@ final class MobileErrorCatalog
         'TICKET_OPEN_EXISTS' => ['zh' => '存在未关闭的工单', 'en' => 'An open ticket already exists.'],
         'TICKET_ALREADY_CLOSED' => ['zh' => '工单已关闭', 'en' => 'Ticket is already closed.'],
         'DEVICE_INVALID' => ['zh' => '设备登记信息不被接受', 'en' => 'Device registration payload is invalid.'],
+        'DELETION_CONFIRMATION_INVALID' => ['zh' => '删除确认无效', 'en' => 'Account deletion confirmation is invalid.'],
+        'DELETION_PLAY_WARNING_REQUIRED' => ['zh' => '必须确认 Play 订阅不会因删号自动取消', 'en' => 'You must acknowledge that Play subscriptions are not cancelled by deleting the Xboard account.'],
         'INTERNAL_ERROR' => ['zh' => '服务暂时不可用', 'en' => 'Service is temporarily unavailable.'],
     ];
 

@@ -12,7 +12,8 @@
   "accountDeletion": {
     "version": "deletion-v1",
     "url": "https://example.invalid/legal/account-deletion",
-    "playSubscriptionWarning": "Deleting the Xboard account does not cancel Play subscriptions."
+    "playSubscriptionWarning": "Deleting the Xboard account does not cancel Play subscriptions. Manage or cancel them in Google Play.",
+    "playSubscriptionManagementUrl": "https://play.google.com/store/account/subscriptions"
   },
   "support": {
     "supportUrl": "https://example.invalid/support",
