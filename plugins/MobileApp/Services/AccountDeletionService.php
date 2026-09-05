@@ -9,6 +9,7 @@ use App\Services\AuthService;
 use App\Utils\Helper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Plugin\MobileApp\Adapters\AuthAdapter;
 use Plugin\MobileApp\Exceptions\MobileApiException;
 use Plugin\MobileApp\Models\AccountLink;
 use Plugin\MobileApp\Models\DeletionRequest;
@@ -32,7 +33,7 @@ final class AccountDeletionService
         $warning = (string) ($legal['playSubscriptionWarning'] ?? 'Deleting the Xboard account does not cancel Play subscriptions.');
         $managementUrl = (string) ($legal['playSubscriptionManagementUrl'] ?? 'https://play.google.com/store/account/subscriptions');
         if ($this->executedRequest($user) instanceof DeletionRequest) {
-            MobileLogRedactor::error('deletion_preview', ['status' => self::STATUS_EXECUTED, 'opaqueAccountId' => hash('sha256', 'mobile-app:account:v1:' . $user->id)]);
+            MobileLogRedactor::error('deletion_preview', ['status' => self::STATUS_EXECUTED, 'opaqueAccountId' => AuthAdapter::opaqueAccountId($user)]);
             return [
                 'playSubscriptionWarning' => $warning,
                 'requiresConfirmation' => false,
@@ -63,7 +64,7 @@ final class AccountDeletionService
         } else {
             DeletionRequest::query()->create($fields);
         }
-        MobileLogRedactor::error('deletion_preview', ['status' => self::STATUS_PENDING, 'opaqueAccountId' => hash('sha256', 'mobile-app:account:v1:' . $user->id)]);
+        MobileLogRedactor::error('deletion_preview', ['status' => self::STATUS_PENDING, 'opaqueAccountId' => AuthAdapter::opaqueAccountId($user)]);
         return [
             'playSubscriptionWarning' => $warning,
             'requiresConfirmation' => true,
@@ -95,6 +96,7 @@ final class AccountDeletionService
             }
             $executed = $this->executedRequest($fresh);
             if ($executed instanceof DeletionRequest) {
+                (new AuthService($fresh))->removeAllSessions();
                 $dto = $this->executedDto();
                 return;
             }
@@ -103,9 +105,9 @@ final class AccountDeletionService
             $this->purgePersonalPluginData($fresh);
             $this->anonymizeTickets($fresh);
             $this->markExecuted($fresh);
+            (new AuthService($fresh))->removeAllSessions();
             $dto = $this->executedDto();
         });
-        (new AuthService($user))->removeAllSessions();
         MobileLogRedactor::error('deletion_execute', ['status' => self::STATUS_EXECUTED]);
         return $dto;
     }
@@ -145,6 +147,7 @@ final class AccountDeletionService
         $user->group_id = null;
         $user->expired_at = 0;
         $user->transfer_enable = 0;
+        $user->last_login_at = null;
         $user->save();
     }
 

@@ -212,8 +212,8 @@ try {
     $notice->sort = 1;
     $notice->save();
     $opaqueNotice = \Plugin\MobileApp\Adapters\NoticeAdapter::opaqueNoticeId((int) $notice->id);
-    httpRequest('POST', '/api/mobile/v1/notices/' . $opaqueNotice . '/read', $auth);
-    httpRequest('PUT', '/api/mobile/v1/devices', $auth, [
+    $read = httpRequest('POST', '/api/mobile/v1/notices/' . $opaqueNotice . '/read', $auth);
+    $device = httpRequest('PUT', '/api/mobile/v1/devices', $auth, [
         'opaqueDeviceId' => 'device-task029-01',
         'platform' => 'android',
         'appVersion' => '1.0.0',
@@ -224,6 +224,16 @@ try {
         'xrayCoreVersion' => 'v26.7.28',
     ]);
     $ticket = httpRequest('POST', '/api/mobile/v1/tickets', $auth, ['subject' => 'keep-private', 'level' => 1, 'message' => 'personal-ticket-body']);
+    check(
+        'pre_delete_personal_rows_exist',
+        $read->getStatusCode() === 200
+        && $device->getStatusCode() === 200
+        && $ticket->getStatusCode() === 200
+        && \Plugin\MobileApp\Models\Device::query()->where('user_id', $user->id)->count() === 1
+        && \Plugin\MobileApp\Models\NoticeRead::query()->where('user_id', $user->id)->count() === 1
+        && \App\Models\Ticket::query()->where('user_id', $user->id)->count() === 1,
+        ['device' => $device->getStatusCode(), 'ticket' => $ticket->getStatusCode()]
+    );
 
     $accountBefore = httpRequest('GET', '/api/mobile/v1/account', $auth);
     $nodesBefore = httpRequest('GET', '/api/mobile/v1/nodes', $auth);
@@ -312,8 +322,8 @@ try {
         && ($executeBody['data']['mustStopVpn'] ?? null) === true
         && ($executeBody['data']['mustClearSensitiveData'] ?? null) === true
         && ($repeatService['status'] ?? null) === 'executed'
-        && $repeatHttp->getStatusCode() !== 500
-        && in_array(bodyOf($repeatHttp)['errorCode'] ?? null, ['AUTH_SESSION_INVALID', null], true),
+        && $repeatHttp->getStatusCode() !== 200
+        && (bodyOf($repeatHttp)['errorCode'] ?? null) === 'AUTH_SESSION_INVALID',
         ['httpRepeat' => $repeatHttp->getStatusCode(), 'code' => bodyOf($repeatHttp)['errorCode'] ?? null]
     );
 
