@@ -364,4 +364,24 @@
 - 阶段 TASK-023 | `plugins/MobileApp/Adapters/XboardAdapterBoundary.php` | `MobileApp` | 禁止接受客户端提升权益声明，禁止 Play 套餐返回外部购买入口。
 - 阶段 TASK-023 | `tests/task-023/**` | `MobileApp` | Web/Play 权益、独立拒绝态、到期合并、客户端篡改和脱敏测试。
 
+## 2026-09-06 TASK-024 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-024 | `plugins/MobileApp/Services/NodeFilter.php` | `MobileApp` | 授权集合二次筛选：VLESS+REALITY+TCP/RAW+Vision+chrome uTLS，拒绝 encryption.enabled、allow_insecure、空 host 和非法端口。
+- 阶段 TASK-024 | `plugins/MobileApp/Adapters/NodeAdapter.php` | `MobileApp` | 每次请求重检权益与 ServerService，输出不透明节点摘要并剥离 Reality 私钥与 decryption。
+- 阶段 TASK-024 | `plugins/MobileApp/Controllers/NodeController.php` | `MobileApp` | `GET /nodes`。
+- 阶段 TASK-024 | `plugins/MobileApp/docs/node-filter-reasons.json` | `MobileApp` | 筛选拒绝原因。
+- 阶段 TASK-024 | `plugins/MobileApp/docs/node-filter-reasons.md` | `MobileApp` | 拒绝原因说明。
+- 阶段 TASK-024 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 节点列表接到 NodeController。
+- 阶段 TASK-024 | `plugins/MobileApp/Adapters/XboardAdapterBoundary.php` | `MobileApp` | 禁止主键绕过 ServerService、缓存授权集合和节点凭证泄漏。
+- 阶段 TASK-024 | `tests/task-024/**` | `MobileApp` | 用户组/隐藏/配额/协议/传输/uTLS/encryption/凭证脱敏隔离测试。
+
+## 2026-09-06 TASK-025 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-025 | `plugins/MobileApp/Services/ProfileService.php` | `MobileApp` | 按 TASK-024 授权集合组装 Schema 1 Profile，拒绝不完整、越权和禁止字段。
+- 阶段 TASK-025 | `plugins/MobileApp/Controllers/ProfileController.php` | `MobileApp` | `GET /profiles/{opaqueProfileId}`。
+- 阶段 TASK-025 | `plugins/MobileApp/docs/profile-field-sources.json` | `MobileApp` | 字段来源与禁止清单。
+- 阶段 TASK-025 | `plugins/MobileApp/docs/profile-field-sources.md` | `MobileApp` | 字段来源说明。
+- 阶段 TASK-025 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 Profile 接到 ProfileController；Play 购买仍为骨架。
+- 阶段 TASK-025 | `tests/task-025/**` | `MobileApp` | 来源核对、缺字段、Schema、越权/隐藏/encryption/过期和脱敏隔离测试。
+
 

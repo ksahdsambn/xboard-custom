@@ -1,0 +1,23 @@
+{
+  "taskId": "TASK-024",
+  "authorizationSource": "App\\Services\\ServerService::getAvailableServers",
+  "filter": "Plugin\\MobileApp\\Services\\NodeFilter",
+  "summary": "Plugin\\MobileApp\\Adapters\\NodeAdapter",
+  "itemFields": ["opaqueNodeId", "name", "region", "available", "latencyMs"],
+  "reasons": {
+    "protocol_not_vless": "type is not vless",
+    "security_not_reality": "tls is not Reality (2)",
+    "network_not_tcp": "network is not tcp or raw",
+    "flow_not_vision": "flow is not xtls-rprx-vision",
+    "utls_disabled": "uTLS is not explicitly enabled",
+    "fingerprint_random": "fingerprint is random",
+    "fingerprint_unsupported": "fingerprint is missing or not chrome",
+    "allow_insecure": "insecure verification is allowed on protocol, Reality, or TLS settings",
+    "missing_host": "server host is empty",
+    "invalid_port": "resolved port is missing or outside 1-65535",
+    "encryption_enabled": "VLESS encryption is enabled; Schema 1 requires none",
+    "missing_server_name": "Reality server name is empty",
+    "missing_public_key": "Reality public key is empty",
+    "missing_short_id": "Reality short ID is empty"
+  }
+}

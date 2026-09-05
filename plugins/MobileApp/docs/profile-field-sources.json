@@ -1,0 +1,27 @@
+{
+  "taskId": "TASK-025",
+  "schemaVersion": 1,
+  "opaqueProfileId": "same as TASK-024 opaqueNodeId, rechecked against ServerService authorized set",
+  "sources": {
+    "server": "Xboard Server.host",
+    "port": "ServerService resolved port for the user",
+    "userId": "ServerService VLESS user credential (password)",
+    "flow": "protocol_settings.flow, xtls-rprx-vision only",
+    "security": "Reality when protocol_settings.tls = 2",
+    "network": "protocol_settings.network, tcp or raw",
+    "serverName": "protocol_settings.reality_settings.server_name",
+    "publicKey": "protocol_settings.reality_settings.public_key",
+    "shortId": "protocol_settings.reality_settings.short_id",
+    "fingerprint": "protocol_settings.utls.fingerprint when utls.enabled",
+    "spiderX": "fixed /",
+    "mtu": 1280,
+    "entitlementExpiresAtEpochMs": "EntitlementService",
+    "encryption": "none; nodes with encryption.enabled are rejected by TASK-024"
+  },
+  "forbidden": [
+    "privateKey",
+    "protocol_settings",
+    "subscribeUrl",
+    "subscriptionToken"
+  ]
+}

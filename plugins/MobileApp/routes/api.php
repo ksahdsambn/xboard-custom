@@ -6,7 +6,9 @@ use Plugin\MobileApp\Controllers\AdminCompatController;
 use Plugin\MobileApp\Controllers\AuthController;
 use Plugin\MobileApp\Controllers\BootstrapController;
 use Plugin\MobileApp\Controllers\LegalController;
+use Plugin\MobileApp\Controllers\NodeController;
 use Plugin\MobileApp\Controllers\PlanController;
+use Plugin\MobileApp\Controllers\ProfileController;
 use Plugin\MobileApp\Controllers\SkeletonController;
 
 $registerVersion = static function (string $version): void {
@@ -30,9 +32,9 @@ $registerVersion = static function (string $version): void {
             Route::get('account', [AccountController::class, 'show'])->name($namePrefix . 'account.get');
             Route::get('entitlement', [AccountController::class, 'entitlement'])->name($namePrefix . 'entitlement.get');
             Route::get('plans', [PlanController::class, 'index'])->name($namePrefix . 'plans.list');
-            Route::get('nodes', [$controller, 'notImplemented'])->name($namePrefix . 'nodes.list');
+            Route::get('nodes', [NodeController::class, 'index'])->name($namePrefix . 'nodes.list');
             Route::middleware('mobile.startup:connect')->group(function () use ($namePrefix, $controller): void {
-                Route::get('profiles/{opaqueProfileId}', [$controller, 'notImplemented'])->name($namePrefix . 'profiles.get');
+                Route::get('profiles/{opaqueProfileId}', [ProfileController::class, 'show'])->name($namePrefix . 'profiles.get');
             });
             Route::get('notices', [$controller, 'notImplemented'])->name($namePrefix . 'notices.list');
             Route::get('notices/{noticeId}', [$controller, 'notImplemented'])->name($namePrefix . 'notices.get');
