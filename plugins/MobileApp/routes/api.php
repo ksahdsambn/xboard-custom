@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Plugin\MobileApp\Controllers\AccountController;
 use Plugin\MobileApp\Controllers\AdminCompatController;
+use Plugin\MobileApp\Controllers\AdminPlayProductController;
 use Plugin\MobileApp\Controllers\AuthController;
 use Plugin\MobileApp\Controllers\BootstrapController;
 use Plugin\MobileApp\Controllers\DeletionController;
@@ -11,6 +12,7 @@ use Plugin\MobileApp\Controllers\LegalController;
 use Plugin\MobileApp\Controllers\NodeController;
 use Plugin\MobileApp\Controllers\NoticeController;
 use Plugin\MobileApp\Controllers\PlanController;
+use Plugin\MobileApp\Controllers\PlayPurchaseController;
 use Plugin\MobileApp\Controllers\ProfileController;
 use Plugin\MobileApp\Controllers\SkeletonController;
 use Plugin\MobileApp\Controllers\TicketController;
@@ -50,8 +52,8 @@ $registerVersion = static function (string $version): void {
             Route::post('tickets/{ticketId}/close', [TicketController::class, 'close'])->name($namePrefix . 'tickets.close');
             Route::put('devices', [DeviceController::class, 'upsert'])->name($namePrefix . 'devices.register');
             Route::middleware('mobile.startup:purchase')->group(function () use ($namePrefix, $controller): void {
-                Route::post('play/purchases', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.submit');
-                Route::post('play/purchases/restore', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.restore');
+                Route::post('play/purchases', [PlayPurchaseController::class, 'submit'])->name($namePrefix . 'play.purchase.submit');
+                Route::post('play/purchases/restore', [PlayPurchaseController::class, 'restore'])->name($namePrefix . 'play.purchase.restore');
             });
             Route::post('account/deletion/preview', [DeletionController::class, 'preview'])->name($namePrefix . 'account.deletion.preview');
             Route::post('account/deletion', [DeletionController::class, 'submit'])->name($namePrefix . 'account.deletion.submit');
@@ -59,8 +61,8 @@ $registerVersion = static function (string $version): void {
         });
 
         Route::middleware(['admin', 'log'])->prefix('admin')->group(function () use ($namePrefix, $controller): void {
-            Route::get('play-products', [$controller, 'notImplemented'])->name($namePrefix . 'admin.playProducts.list');
-            Route::put('play-products', [$controller, 'notImplemented'])->name($namePrefix . 'admin.playProducts.upsert');
+            Route::get('play-products', [AdminPlayProductController::class, 'index'])->name($namePrefix . 'admin.playProducts.list');
+            Route::put('play-products', [AdminPlayProductController::class, 'upsert'])->name($namePrefix . 'admin.playProducts.upsert');
             Route::get('compat', [AdminCompatController::class, 'show'])->name($namePrefix . 'admin.compat.get');
             Route::put('compat', [AdminCompatController::class, 'update'])->name($namePrefix . 'admin.compat.update');
         });

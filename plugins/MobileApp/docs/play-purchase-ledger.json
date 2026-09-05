@@ -1,0 +1,19 @@
+{
+  "taskId": "TASK-031",
+  "platform": "google_play",
+  "unique": ["platform", "purchase_token_hash"],
+  "persistFirst": true,
+  "developerApiSourceOfTruth": true,
+  "acknowledge": {
+    "firstPurchaseOnly": true,
+    "afterPersistAndGrant": true,
+    "windowSeconds": 259200,
+    "renewalsMustNotAcknowledge": true
+  },
+  "playStatuses": ["pending", "purchased", "canceled", "expired", "refunded", "revoked", "grace", "account_hold", "restored"],
+  "ignoredClientClaims": ["price", "planId", "duration", "expiresAt", "entitlement"],
+  "rawTokenStorage": false,
+  "userRowProjectionDeferredTo": "TASK-033",
+  "rtdnDeferredTo": "TASK-032",
+  "realGooglePlayClaimed": false
+}

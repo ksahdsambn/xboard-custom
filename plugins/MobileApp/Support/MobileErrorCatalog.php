@@ -54,6 +54,8 @@ final class MobileErrorCatalog
         'DEVICE_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
         'DELETION_CONFIRMATION_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
         'DELETION_PLAY_WARNING_REQUIRED' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
+        'PLAY_PRODUCT_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
+        'PLAY_PRODUCT_DUPLICATE' => ['http' => [409], 'defaultHttp' => 409, 'reLogin' => false],
         'INTERNAL_ERROR' => ['http' => [500], 'defaultHttp' => 500, 'reLogin' => false],
     ];
 
@@ -94,6 +96,8 @@ final class MobileErrorCatalog
         'DEVICE_INVALID' => ['zh' => '设备登记信息不被接受', 'en' => 'Device registration payload is invalid.'],
         'DELETION_CONFIRMATION_INVALID' => ['zh' => '删除确认无效', 'en' => 'Account deletion confirmation is invalid.'],
         'DELETION_PLAY_WARNING_REQUIRED' => ['zh' => '必须确认 Play 订阅不会因删号自动取消', 'en' => 'You must acknowledge that Play subscriptions are not cancelled by deleting the Xboard account.'],
+        'PLAY_PRODUCT_INVALID' => ['zh' => 'Play 商品映射无效', 'en' => 'Play product mapping is invalid.'],
+        'PLAY_PRODUCT_DUPLICATE' => ['zh' => '该 Play 商品已在当前环境映射', 'en' => 'This Play product is already mapped in the current environment.'],
         'INTERNAL_ERROR' => ['zh' => '服务暂时不可用', 'en' => 'Service is temporarily unavailable.'],
     ];
 

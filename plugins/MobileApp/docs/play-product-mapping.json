@@ -1,0 +1,17 @@
+{
+  "taskId": "TASK-030",
+  "packageName": "dev.xboard.xboard_mobile",
+  "environments": ["sandbox", "production"],
+  "uniqueProduct": ["package_name", "product_id", "environment"],
+  "sellableRequires": ["enabled", "currentEnvironment", "matchingPackage", "planShowAndSell", "planHasCapacity"],
+  "ignoredClientClaims": ["price", "planId", "duration", "expiresAt", "trafficLimit"],
+  "forbiddenSellableFields": ["stripeUrl", "bepusdt", "walletTopup", "webCheckout", "prices", "id", "groupId"],
+  "admin": {
+    "list": "GET /admin/play-products",
+    "upsert": "PUT /admin/play-products",
+    "success": ["id", "enabled"]
+  },
+  "auditTable": "mobile_app_play_product_audits",
+  "auditActions": ["create", "update", "enable", "disable"],
+  "playPurchaseDeferredTo": "TASK-031"
+}

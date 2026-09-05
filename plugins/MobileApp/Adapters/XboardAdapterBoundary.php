@@ -24,5 +24,15 @@ final class XboardAdapterBoundary
         'treat logout or disable as account deletion',
         'cancel Play subscriptions when deleting an Xboard account',
         'keep sessions, email or Profile access after account deletion execute',
+        'trust client price, plan id, duration or expiry for Play product mapping',
+        'map Play products with a package name other than the Android applicationId',
+        'share sandbox and production Play product mappings',
+        'expose stripe, bepusdt, wallet topup or web checkout in the Play catalog',
+        'grant entitlement from Play product mapping without purchase verification',
+        'trust client price, plan, duration or entitlement for Play purchases',
+        'acknowledge a Play purchase before persisting the token and recording a ledger grant',
+        'acknowledge Play renewals',
+        'store raw purchase tokens or call production Google Play from development fixtures',
+        'project Play ledger onto Xboard user plan fields before TASK-033',
     ];
 }

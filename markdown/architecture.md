@@ -397,4 +397,29 @@
 - 阶段 TASK-029 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 删号接到 DeletionController；Play 购买仍为骨架。
 - 阶段 TASK-029 | `tests/task-029/**` | `MobileApp` | 申请、身份失败、确认、重复执行、删除后不可用和隔离保留测试。
 
+## 2026-09-06 TASK-030 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-030 | `plugins/MobileApp/Services/PlayProductService.php` | `MobileApp` | Play 商品与 Xboard 套餐映射：package/环境/可售套餐校验、Product ID 唯一、审计。
+- 阶段 TASK-030 | `plugins/MobileApp/Controllers/AdminPlayProductController.php` | `MobileApp` | 管理端列出与 upsert 映射。
+- 阶段 TASK-030 | `plugins/MobileApp/Adapters/PlanAdapter.php` | `MobileApp` | 可售目录只返回当前环境启用的 Play 映射。
+- 阶段 TASK-030 | `plugins/MobileApp/Models/PlayProductAudit.php` | `MobileApp` | 映射变更审计。
+- 阶段 TASK-030 | `plugins/MobileApp/database/migrations/2026_09_06_210000_add_play_product_id_environment_unique.php` | `MobileApp` | Product ID 环境唯一约束。
+- 阶段 TASK-030 | `plugins/MobileApp/database/migrations/2026_09_06_210001_create_mobile_app_play_product_audits_table.php` | `MobileApp` | 映射审计表。
+- 阶段 TASK-030 | `plugins/MobileApp/docs/play-product-mapping.json` | `MobileApp` | 映射规则。
+- 阶段 TASK-030 | `plugins/MobileApp/docs/play-product-mapping.md` | `MobileApp` | 映射说明。
+- 阶段 TASK-030 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 管理映射接线；购买上报仍为骨架。
+- 阶段 TASK-030 | `tests/task-030/**` | `MobileApp` | 映射唯一性、环境隔离、停用、失效套餐和忽略客户端声明测试。
+
+## 2026-09-06 TASK-031 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-031 | `plugins/MobileApp/Services/PlayPurchaseService.php` | `MobileApp` | 先持久化令牌哈希再复查 Developer API；首次确认；续费不重复确认；不写用户套餐字段。
+- 阶段 TASK-031 | `plugins/MobileApp/Adapters/PlayDeveloperAdapter.php` | `MobileApp` | 进程内非生产订阅状态夹具，不调用真实 Google Play。
+- 阶段 TASK-031 | `plugins/MobileApp/Controllers/PlayPurchaseController.php` | `MobileApp` | 购买上报与恢复 HTTP。
+- 阶段 TASK-031 | `plugins/MobileApp/Models/PurchaseToken.php` | `MobileApp` | 账本授予与确认时间字段。
+- 阶段 TASK-031 | `plugins/MobileApp/database/migrations/2026_09_06_220000_add_purchase_token_grant_ack_columns.php` | `MobileApp` | 账本授予/确认/续费列。
+- 阶段 TASK-031 | `plugins/MobileApp/docs/play-purchase-ledger.json` | `MobileApp` | 账本规则。
+- 阶段 TASK-031 | `plugins/MobileApp/docs/play-purchase-ledger.md` | `MobileApp` | 账本说明。
+- 阶段 TASK-031 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 购买接线；RTDN 仍为骨架。
+- 阶段 TASK-031 | `tests/task-031/**` | `MobileApp` | 首次购买、幂等、状态矩阵、拒绝分支和脱敏测试。
+
 

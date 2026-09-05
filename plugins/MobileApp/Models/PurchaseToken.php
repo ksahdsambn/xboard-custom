@@ -12,6 +12,10 @@ class PurchaseToken extends Model
 
     protected $casts = [
         'acknowledged' => 'boolean',
+        'is_renewal' => 'boolean',
         'next_retry_at' => 'datetime',
+        'granted_at' => 'datetime',
+        'acknowledged_at' => 'datetime',
+        'verified_at' => 'datetime',
     ];
 }
