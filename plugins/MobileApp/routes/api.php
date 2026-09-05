@@ -5,11 +5,14 @@ use Plugin\MobileApp\Controllers\AccountController;
 use Plugin\MobileApp\Controllers\AdminCompatController;
 use Plugin\MobileApp\Controllers\AuthController;
 use Plugin\MobileApp\Controllers\BootstrapController;
+use Plugin\MobileApp\Controllers\DeviceController;
 use Plugin\MobileApp\Controllers\LegalController;
 use Plugin\MobileApp\Controllers\NodeController;
+use Plugin\MobileApp\Controllers\NoticeController;
 use Plugin\MobileApp\Controllers\PlanController;
 use Plugin\MobileApp\Controllers\ProfileController;
 use Plugin\MobileApp\Controllers\SkeletonController;
+use Plugin\MobileApp\Controllers\TicketController;
 
 $registerVersion = static function (string $version): void {
     $namePrefix = 'mobile.v' . $version . '.';
@@ -36,15 +39,15 @@ $registerVersion = static function (string $version): void {
             Route::middleware('mobile.startup:connect')->group(function () use ($namePrefix, $controller): void {
                 Route::get('profiles/{opaqueProfileId}', [ProfileController::class, 'show'])->name($namePrefix . 'profiles.get');
             });
-            Route::get('notices', [$controller, 'notImplemented'])->name($namePrefix . 'notices.list');
-            Route::get('notices/{noticeId}', [$controller, 'notImplemented'])->name($namePrefix . 'notices.get');
-            Route::post('notices/{noticeId}/read', [$controller, 'notImplemented'])->name($namePrefix . 'notices.read');
-            Route::post('tickets', [$controller, 'notImplemented'])->name($namePrefix . 'tickets.create');
-            Route::get('tickets', [$controller, 'notImplemented'])->name($namePrefix . 'tickets.list');
-            Route::get('tickets/{ticketId}', [$controller, 'notImplemented'])->name($namePrefix . 'tickets.get');
-            Route::post('tickets/{ticketId}/replies', [$controller, 'notImplemented'])->name($namePrefix . 'tickets.reply');
-            Route::post('tickets/{ticketId}/close', [$controller, 'notImplemented'])->name($namePrefix . 'tickets.close');
-            Route::put('devices', [$controller, 'notImplemented'])->name($namePrefix . 'devices.register');
+            Route::get('notices', [NoticeController::class, 'index'])->name($namePrefix . 'notices.list');
+            Route::get('notices/{noticeId}', [NoticeController::class, 'show'])->name($namePrefix . 'notices.get');
+            Route::post('notices/{noticeId}/read', [NoticeController::class, 'read'])->name($namePrefix . 'notices.read');
+            Route::post('tickets', [TicketController::class, 'store'])->name($namePrefix . 'tickets.create');
+            Route::get('tickets', [TicketController::class, 'index'])->name($namePrefix . 'tickets.list');
+            Route::get('tickets/{ticketId}', [TicketController::class, 'show'])->name($namePrefix . 'tickets.get');
+            Route::post('tickets/{ticketId}/replies', [TicketController::class, 'reply'])->name($namePrefix . 'tickets.reply');
+            Route::post('tickets/{ticketId}/close', [TicketController::class, 'close'])->name($namePrefix . 'tickets.close');
+            Route::put('devices', [DeviceController::class, 'upsert'])->name($namePrefix . 'devices.register');
             Route::middleware('mobile.startup:purchase')->group(function () use ($namePrefix, $controller): void {
                 Route::post('play/purchases', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.submit');
                 Route::post('play/purchases/restore', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.restore');

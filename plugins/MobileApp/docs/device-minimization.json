@@ -1,0 +1,7 @@
+{
+  "taskId": "TASK-028",
+  "collected": ["opaqueDeviceId", "platform", "appVersion", "androidApi", "mobileApiVersion", "profileSchemaVersion", "libxrayVersion", "xrayCoreVersion", "lastSeenAt"],
+  "forbidden": ["advertisingId", "aaid", "gaid", "idfa", "imei", "hardwareSerial", "androidId", "macAddress"],
+  "entitlement": "registration must not grant or change entitlement",
+  "lifecycle": "idempotent upsert on user_id+opaque_device_id; multi-device allowed; logout does not delete rows in this task"
+}

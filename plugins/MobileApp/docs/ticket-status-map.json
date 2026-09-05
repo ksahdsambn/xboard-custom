@@ -1,0 +1,16 @@
+{
+  "taskId": "TASK-027",
+  "officialStatus": {"0": "open", "1": "closed"},
+  "officialReplyStatus": {"0": "waiting_staff", "1": "waiting_user_or_idle"},
+  "errors": {
+    "TICKET_NOT_FOUND": 404,
+    "TICKET_CLOSED": 403,
+    "TICKET_WAIT_REPLY": 403,
+    "TICKET_EMPTY": 400,
+    "TICKET_OPEN_EXISTS": 409,
+    "TICKET_ALREADY_CLOSED": 409,
+    "AUTH_FORBIDDEN": 403
+  },
+  "attachmentsSupported": false,
+  "scope": "current user only; TicketService.createTicket and reply"
+}

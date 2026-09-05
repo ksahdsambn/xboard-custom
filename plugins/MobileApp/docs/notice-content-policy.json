@@ -1,0 +1,13 @@
+{
+  "taskId": "TASK-026",
+  "source": "App\\Models\\Notice where show=true",
+  "sort": ["sort ASC", "id DESC"],
+  "listFields": ["id", "title", "publishedAt", "read"],
+  "detailFields": ["id", "title", "body", "publishedAt", "read"],
+  "forbidden": ["img_url", "imgUrl", "tags", "show", "content", "user_id", "privateKey"],
+  "htmlAllowedTags": ["p", "br", "strong", "em", "b", "i", "ul", "ol", "li", "a"],
+  "htmlHrefScheme": ["http", "https"],
+  "htmlRemoved": ["script", "iframe", "object", "embed", "style", "eventHandlers", "javascript:"],
+  "readTable": "mobile_app_notice_reads",
+  "readUnique": ["user_id", "notice_id"]
+}

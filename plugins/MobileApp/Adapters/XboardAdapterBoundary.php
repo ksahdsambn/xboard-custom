@@ -18,5 +18,8 @@ final class XboardAdapterBoundary
         'emit mobile node list without EntitlementService and ServerService',
         'emit mobile profile without EntitlementService and ServerService',
         'return Reality private keys or raw protocol settings in Profile DTO',
+        'passthrough official Notice model fields or share notice read state across users',
+        'expose other users tickets or fake attachment upload capability',
+        'collect advertising or hardware identifiers or grant entitlement from device registration',
     ];
 }

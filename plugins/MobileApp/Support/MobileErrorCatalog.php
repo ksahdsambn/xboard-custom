@@ -44,6 +44,14 @@ final class MobileErrorCatalog
         'REGION_UNAVAILABLE' => ['http' => [403], 'defaultHttp' => 403, 'reLogin' => false],
         'FORCE_UPGRADE' => ['http' => [403], 'defaultHttp' => 403, 'reLogin' => false],
         'OPERATION_NOT_IMPLEMENTED' => ['http' => [501], 'defaultHttp' => 501, 'reLogin' => false],
+        'NOTICE_NOT_FOUND' => ['http' => [404], 'defaultHttp' => 404, 'reLogin' => false],
+        'TICKET_NOT_FOUND' => ['http' => [404], 'defaultHttp' => 404, 'reLogin' => false],
+        'TICKET_CLOSED' => ['http' => [403], 'defaultHttp' => 403, 'reLogin' => false],
+        'TICKET_WAIT_REPLY' => ['http' => [403], 'defaultHttp' => 403, 'reLogin' => false],
+        'TICKET_EMPTY' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
+        'TICKET_OPEN_EXISTS' => ['http' => [409], 'defaultHttp' => 409, 'reLogin' => false],
+        'TICKET_ALREADY_CLOSED' => ['http' => [409], 'defaultHttp' => 409, 'reLogin' => false],
+        'DEVICE_INVALID' => ['http' => [400], 'defaultHttp' => 400, 'reLogin' => false],
         'INTERNAL_ERROR' => ['http' => [500], 'defaultHttp' => 500, 'reLogin' => false],
     ];
 
@@ -74,6 +82,14 @@ final class MobileErrorCatalog
         'REGION_UNAVAILABLE' => ['zh' => '当前区域不可用', 'en' => 'This region is unavailable.'],
         'FORCE_UPGRADE' => ['zh' => '需要升级后才能继续', 'en' => 'An upgrade is required to continue.'],
         'OPERATION_NOT_IMPLEMENTED' => ['zh' => '该能力尚未实现', 'en' => 'This operation is not implemented.'],
+        'NOTICE_NOT_FOUND' => ['zh' => '公告不存在', 'en' => 'Notice was not found.'],
+        'TICKET_NOT_FOUND' => ['zh' => '工单不存在', 'en' => 'Ticket was not found.'],
+        'TICKET_CLOSED' => ['zh' => '工单已关闭，无法回复', 'en' => 'The ticket is closed and cannot be replied.'],
+        'TICKET_WAIT_REPLY' => ['zh' => '请等待客服回复', 'en' => 'Please wait for a staff reply.'],
+        'TICKET_EMPTY' => ['zh' => '工单内容不能为空', 'en' => 'Ticket content cannot be empty.'],
+        'TICKET_OPEN_EXISTS' => ['zh' => '存在未关闭的工单', 'en' => 'An open ticket already exists.'],
+        'TICKET_ALREADY_CLOSED' => ['zh' => '工单已关闭', 'en' => 'Ticket is already closed.'],
+        'DEVICE_INVALID' => ['zh' => '设备登记信息不被接受', 'en' => 'Device registration payload is invalid.'],
         'INTERNAL_ERROR' => ['zh' => '服务暂时不可用', 'en' => 'Service is temporarily unavailable.'],
     ];
 
