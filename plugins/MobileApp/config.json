@@ -1,0 +1,19 @@
+{
+    "name": "MobileApp",
+    "code": "mobile_app",
+    "version": "1.0.0",
+    "description": "Versioned Mobile API plugin for Xboard Android and iOS clients. Skeleton only in TASK-017; business adapters start later.",
+    "author": "xboard-mobile",
+    "type": "feature",
+    "require": {
+        "xboard": ">=1.0.0"
+    },
+    "config": {
+        "display_name": {
+            "type": "string",
+            "default": "MobileApp",
+            "label": "显示名称",
+            "description": "MobileApp 插件在后台中的显示名称。"
+        }
+    }
+}

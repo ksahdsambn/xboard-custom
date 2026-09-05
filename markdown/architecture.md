@@ -290,3 +290,12 @@
 - `tests/task-005/run.ps1`再审查增加预先失败报告、源码与重解析输出保护、部分创建失败清理和独立runId；`tests/task-005/audit.php`进一步比较Composer依赖源码引用。
 
 - `tests/task-005/run.ps1`：另固定单次Git archive换行配置，使32份运行源码哈希与冻结Git blob字节一致，消除宿主平台配置差异；不修改全局/官方Git配置。
+
+## 2026-09-05 TASK-017～018 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-017 | `plugins/MobileApp/**` | `MobileApp` | 版本化 Mobile API 功能插件骨架：完整 `/api/mobile/v0` 与 `/api/mobile/v1` 前缀、四类鉴权、启停升级，业务响应未实现。
+- 阶段 TASK-017 | `tests/task-017/**` | `MobileApp` | 冻结官方基线上的安装/启用/停用/升级与官方登录/节点/订单回归。
+- 阶段 TASK-018 | `plugins/MobileApp/database/migrations/*.php` | `MobileApp` | 七张插件自有表；幂等新增；唯一约束覆盖购买令牌、RTDN 事件和外部订阅绑定。
+- 阶段 TASK-018 | `plugins/MobileApp/Models/*.php` | `MobileApp` | 对应七张表的 Eloquent 模型，不含官方表外键。
+- 阶段 TASK-018 | `tests/task-018/**` | `MobileApp` | 空库与官方结构副本迁移、唯一约束和事务回滚。
+

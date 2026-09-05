@@ -1,0 +1,59 @@
+{
+  "pluginCode": "mobile_app",
+  "prefixes": ["/api/mobile/v0", "/api/mobile/v1"],
+  "groups": {
+    "public": {
+      "middleware": ["api"],
+      "paths": [
+        "GET /bootstrap",
+        "GET /legal/privacy",
+        "GET /legal/terms",
+        "GET /legal/account-deletion",
+        "GET /legal/support",
+        "POST /auth/register",
+        "POST /auth/login",
+        "POST /auth/email-code",
+        "POST /auth/password-reset"
+      ]
+    },
+    "user": {
+      "middleware": ["api", "user"],
+      "paths": [
+        "GET /auth/session",
+        "POST /auth/logout",
+        "GET /account",
+        "GET /entitlement",
+        "GET /plans",
+        "GET /nodes",
+        "GET /profiles/{opaqueProfileId}",
+        "GET /notices",
+        "GET /notices/{noticeId}",
+        "POST /notices/{noticeId}/read",
+        "POST /tickets",
+        "GET /tickets",
+        "GET /tickets/{ticketId}",
+        "POST /tickets/{ticketId}/replies",
+        "POST /tickets/{ticketId}/close",
+        "PUT /devices",
+        "POST /play/purchases",
+        "POST /play/purchases/restore",
+        "POST /account/deletion/preview",
+        "POST /account/deletion",
+        "GET /account/deletion"
+      ]
+    },
+    "admin": {
+      "middleware": ["api", "admin", "log"],
+      "paths": [
+        "GET /admin/play-products",
+        "PUT /admin/play-products",
+        "GET /admin/compat",
+        "PUT /admin/compat"
+      ]
+    },
+    "google_platform": {
+      "middleware": ["api", "mobile.google.rtdn"],
+      "paths": ["POST /platform/google/rtdn"]
+    }
+  }
+}
