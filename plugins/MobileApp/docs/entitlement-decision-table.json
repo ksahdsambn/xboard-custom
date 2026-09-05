@@ -1,0 +1,65 @@
+{
+  "taskId": "TASK-023",
+  "uniqueDecisionPoint": "Plugin\\MobileApp\\Services\\EntitlementService",
+  "statusPriority": ["maintenance", "banned", "none", "expired", "exhausted", "active"],
+  "rows": [
+    {
+      "status": "maintenance",
+      "connectAllowed": false,
+      "denialCode": "SERVICE_MAINTENANCE",
+      "when": "compat settings maintenance is true"
+    },
+    {
+      "status": "banned",
+      "connectAllowed": false,
+      "denialCode": "AUTH_ACCOUNT_BANNED",
+      "when": "Xboard user.banned is true"
+    },
+    {
+      "status": "none",
+      "connectAllowed": false,
+      "denialCode": "ENTITLEMENT_NONE",
+      "when": "no plan_id and no active play projection"
+    },
+    {
+      "status": "expired",
+      "connectAllowed": false,
+      "denialCode": "ENTITLEMENT_EXPIRED",
+      "when": "merged expiry is finite and not after now"
+    },
+    {
+      "status": "exhausted",
+      "connectAllowed": false,
+      "denialCode": "ENTITLEMENT_EXHAUSTED",
+      "when": "remaining billing traffic is zero"
+    },
+    {
+      "status": "active",
+      "connectAllowed": true,
+      "denialCode": null,
+      "when": "not banned, not maintenance, grant exists, not expired, remaining traffic > 0"
+    }
+  ],
+  "sources": {
+    "play": "active play projection that has not expired",
+    "web": "Xboard plan_id without an active play projection",
+    "none": "no web plan and no active play projection"
+  },
+  "merge": "effective expiry is the later of web expired_at and play projection expire_at; never-expire wins; must not shorten a longer existing grant; remaining/used/transfer bytes always come from Xboard user u+d and transfer_enable",
+  "ignoredClientClaims": [
+    "planId",
+    "groupId",
+    "price",
+    "duration",
+    "expiresAt",
+    "trafficLimit",
+    "resetAt",
+    "plan_id",
+    "group_id",
+    "transfer_enable",
+    "expired_at",
+    "next_reset_at"
+  ],
+  "playCatalog": "PlanService available plans intersected with enabled PlayProduct mappings; no web checkout fields",
+  "walletCenterNote": "playManaged true must not be auto-renewed by WalletCenter; hook deferred beyond TASK-023"
+}

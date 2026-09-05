@@ -351,3 +351,17 @@
 - 阶段 TASK-022 | `plugins/MobileApp/docs/auth-rate-limit.json` | `MobileApp` | 限流配额与枚举策略。
 - 阶段 TASK-022 | `tests/task-022/**` | `MobileApp` | v0/v1 全流程、验证码、封禁、超频、枚举和脱敏测试。
 
+## 2026-09-05 TASK-023 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-023 | `plugins/MobileApp/Services/EntitlementService.php` | `MobileApp` | 移动权益唯一裁决点：套餐、状态、到期、剩余流量、重置、来源和是否可连接。
+- 阶段 TASK-023 | `plugins/MobileApp/Adapters/AccountAdapter.php` | `MobileApp` | 账户 DTO，邮箱脱敏，禁止透传用户主键和钱包字段。
+- 阶段 TASK-023 | `plugins/MobileApp/Adapters/PlanAdapter.php` | `MobileApp` | Play 发行包可售套餐过滤，禁止 Web/钱包结账字段。
+- 阶段 TASK-023 | `plugins/MobileApp/Controllers/AccountController.php` | `MobileApp` | 账户与权益查询 HTTP。
+- 阶段 TASK-023 | `plugins/MobileApp/Controllers/PlanController.php` | `MobileApp` | 套餐列表 HTTP。
+- 阶段 TASK-023 | `plugins/MobileApp/docs/entitlement-decision-table.json` | `MobileApp` | 权益决策表。
+- 阶段 TASK-023 | `plugins/MobileApp/docs/entitlement-decision-table.md` | `MobileApp` | 决策表说明。
+- 阶段 TASK-023 | `plugins/MobileApp/routes/api.php` | `MobileApp` | v0/v1 账户、权益、套餐从骨架改为正式控制器。
+- 阶段 TASK-023 | `plugins/MobileApp/Adapters/XboardAdapterBoundary.php` | `MobileApp` | 禁止接受客户端提升权益声明，禁止 Play 套餐返回外部购买入口。
+- 阶段 TASK-023 | `tests/task-023/**` | `MobileApp` | Web/Play 权益、独立拒绝态、到期合并、客户端篡改和脱敏测试。
+
+
