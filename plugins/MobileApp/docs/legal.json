@@ -1,0 +1,21 @@
+{
+  "privacy": {
+    "version": "privacy-v1",
+    "url": "https://example.invalid/legal/privacy",
+    "content": "VPN is used only to establish a VLESS REALITY tunnel. The app does not collect visited domains, DNS history or traffic payloads."
+  },
+  "terms": {
+    "version": "terms-v1",
+    "url": "https://example.invalid/legal/terms",
+    "content": "Service terms for the Xboard mobile client. Digital subscriptions use Google Play Billing."
+  },
+  "accountDeletion": {
+    "version": "deletion-v1",
+    "url": "https://example.invalid/legal/account-deletion",
+    "playSubscriptionWarning": "Deleting the Xboard account does not cancel Play subscriptions."
+  },
+  "support": {
+    "supportUrl": "https://example.invalid/support",
+    "email": "support@example.invalid"
+  }
+}

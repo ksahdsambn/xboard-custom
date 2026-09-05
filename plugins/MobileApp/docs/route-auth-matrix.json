@@ -1,9 +1,10 @@
 {
   "pluginCode": "mobile_app",
   "prefixes": ["/api/mobile/v0", "/api/mobile/v1"],
+  "envelopeMiddleware": "mobile.envelope",
   "groups": {
     "public": {
-      "middleware": ["api"],
+      "middleware": ["api", "mobile.envelope"],
       "paths": [
         "GET /bootstrap",
         "GET /legal/privacy",
@@ -17,7 +18,7 @@
       ]
     },
     "user": {
-      "middleware": ["api", "user"],
+      "middleware": ["api", "mobile.envelope", "user"],
       "paths": [
         "GET /auth/session",
         "POST /auth/logout",
@@ -43,7 +44,7 @@
       ]
     },
     "admin": {
-      "middleware": ["api", "admin", "log"],
+      "middleware": ["api", "mobile.envelope", "admin", "log"],
       "paths": [
         "GET /admin/play-products",
         "PUT /admin/play-products",
@@ -52,7 +53,7 @@
       ]
     },
     "google_platform": {
-      "middleware": ["api", "mobile.google.rtdn"],
+      "middleware": ["api", "mobile.envelope", "mobile.google.rtdn"],
       "paths": ["POST /platform/google/rtdn"]
     }
   }

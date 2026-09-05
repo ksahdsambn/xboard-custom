@@ -40,6 +40,7 @@ PluginManager::disable('mobile_app')
 
 | 分组 | 前缀内路径 | 中间件 |
 | --- | --- | --- |
+| 全部 | `/api/mobile/v0/**` 与 `/api/mobile/v1/**` | `mobile.envelope`（请求标识、错误映射、脱敏） |
 | public | bootstrap、legal/*、auth/register、auth/login、auth/email-code、auth/password-reset | 仅 api 组 |
 | user | 账户、权益、节点、Profile、公告、工单、设备、Play 上报、删号 | `user` |
 | admin | admin/play-products、admin/compat | `admin` + `log` |

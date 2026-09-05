@@ -12,13 +12,9 @@ class SkeletonController extends PluginController
     public function notImplemented(): JsonResponse
     {
         if (!PluginStatus::isEnabled()) {
-            return MobileEnvelope::fail('SERVICE_MAINTENANCE', 404, 'MobileApp plugin is not enabled');
+            return MobileEnvelope::fail('SERVICE_MAINTENANCE', 503);
         }
 
-        return MobileEnvelope::fail(
-            'OPERATION_NOT_IMPLEMENTED',
-            501,
-            'MobileApp skeleton; business implementation starts at TASK-019'
-        );
+        return MobileEnvelope::fail('OPERATION_NOT_IMPLEMENTED', 501);
     }
 }

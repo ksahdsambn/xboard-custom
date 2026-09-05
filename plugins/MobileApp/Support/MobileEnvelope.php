@@ -3,7 +3,6 @@
 namespace Plugin\MobileApp\Support;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Str;
 
 final class MobileEnvelope
 {
@@ -18,44 +17,52 @@ final class MobileEnvelope
 
     public static function success(mixed $data, int $http = 200): JsonResponse
     {
-        $apiVersion = self::apiVersionFromRequest();
-        $payload = [
-            'status' => 'success',
-            'message' => 'ok',
-            'data' => $data,
-            'error' => null,
-            'errorCode' => null,
-            'requestId' => self::requestId(),
-        ];
-        if ($apiVersion === 1) {
-            $payload['apiVersion'] = 1;
-        }
-        return response()->json($payload, $http);
+        return self::json('success', 'ok', $data, null, $http);
     }
 
-    public static function fail(string $errorCode, int $http, string $message): JsonResponse
+    public static function paginate(array $items, int $page, int $perPage, int $total): JsonResponse
     {
-        $apiVersion = self::apiVersionFromRequest();
-        $payload = [
-            'status' => 'fail',
-            'message' => $message,
-            'data' => null,
-            'error' => null,
-            'errorCode' => $errorCode,
-            'requestId' => self::requestId(),
-        ];
-        if ($apiVersion === 1) {
-            $payload['apiVersion'] = 1;
+        return self::success(MobilePaginator::payload($items, $page, $perPage, $total));
+    }
+
+    public static function fail(string $errorCode, int $http, ?string $message = null): JsonResponse
+    {
+        $locale = 'zh';
+        try {
+            $locale = (string) (request()->attributes->get('mobile_locale') ?: MobileLocale::resolve());
+        } catch (\Throwable) {
+            $locale = 'zh';
         }
-        return response()->json($payload, $http);
+        $message ??= MobileErrorCatalog::message($errorCode, $locale);
+        return self::json('fail', $message, null, $errorCode, $http);
     }
 
     public static function requestId(): string
     {
-        $header = request()->header('X-Request-Id');
-        if (is_string($header) && $header !== '') {
-            return $header;
+        try {
+            return MobileRequestId::resolve();
+        } catch (\Throwable) {
+            return (string) \Illuminate\Support\Str::uuid();
         }
-        return (string) Str::uuid();
+    }
+
+    private static function json(string $status, string $message, mixed $data, ?string $errorCode, int $http): JsonResponse
+    {
+        $apiVersion = self::apiVersionFromRequest();
+        $requestId = self::requestId();
+        $payload = [
+            'status' => $status,
+            'message' => $message,
+            'data' => $data,
+            'error' => null,
+            'errorCode' => $errorCode,
+            'requestId' => $requestId,
+        ];
+        if ($apiVersion === 1) {
+            $payload['apiVersion'] = 1;
+        }
+        $response = response()->json($payload, $http);
+        $response->headers->set(MobileRequestId::HEADER, $requestId);
+        return $response;
     }
 }

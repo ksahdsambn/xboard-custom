@@ -299,3 +299,36 @@
 - 阶段 TASK-018 | `plugins/MobileApp/Models/*.php` | `MobileApp` | 对应七张表的 Eloquent 模型，不含官方表外键。
 - 阶段 TASK-018 | `tests/task-018/**` | `MobileApp` | 空库与官方结构副本迁移、唯一约束和事务回滚。
 
+## 2026-09-05 TASK-019 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobileErrorCatalog.php` | `MobileApp` | 稳定机器错误码、HTTP 与中英文展示文案。
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobileErrorMapper.php` | `MobileApp` | 将官方 ApiException、Sanctum 未认证和 Admin JSON 翻译为机器码。
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobileEnvelope.php` | `MobileApp` | 保持 Xboard 外层语义并增加 errorCode/requestId/分页。
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobileRequestId.php` | `MobileApp` | UUID 请求标识绑定与非法头丢弃。
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobileClientDecision.php` | `MobileApp` | 客户端只依据 HTTP 与 errorCode 判定是否重新登录。
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobilePaginator.php` | `MobileApp` | 移动分页 DTO，禁止官方 data/total 混用外层。
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobileLogRedactor.php` | `MobileApp` | 日志脱敏，不记录令牌或连接凭证。
+- 阶段 TASK-019 | `plugins/MobileApp/Support/MobileLocale.php` | `MobileApp` | 展示语言，不影响机器码。
+- 阶段 TASK-019 | `plugins/MobileApp/Exceptions/MobileApiException.php` | `MobileApp` | 插件稳定错误异常。
+- 阶段 TASK-019 | `plugins/MobileApp/Http/Middleware/MobileEnvelopeMiddleware.php` | `MobileApp` | 全部移动路由的信封、映射与 testing 夹具门。
+- 阶段 TASK-019 | `plugins/MobileApp/docs/error-http-matrix.json` | `MobileApp` | 错误码与 HTTP 矩阵。
+- 阶段 TASK-019 | `plugins/MobileApp/docs/request-id-tracing.md` | `MobileApp` | 请求标识追踪说明。
+- 阶段 TASK-019 | `tests/task-019/**` | `MobileApp` | 隔离运行 P0 错误、会话/业务 403 和脱敏扫描。
+
+## 2026-09-05 TASK-020 文件洞察（Grok 4.6 / xAI）
+
+- 阶段 TASK-020 | `plugins/MobileApp/Services/StartupConfigService.php` | `MobileApp` | 启动状态评估、精确内核熔断、强制升级批准与审计。
+- 阶段 TASK-020 | `plugins/MobileApp/Services/LegalDocumentService.php` | `MobileApp` | 静态法律文案，不含可执行载荷。
+- 阶段 TASK-020 | `plugins/MobileApp/Controllers/BootstrapController.php` | `MobileApp` | 启动配置查询。
+- 阶段 TASK-020 | `plugins/MobileApp/Controllers/LegalController.php` | `MobileApp` | 隐私、条款、删号说明和客服。
+- 阶段 TASK-020 | `plugins/MobileApp/Controllers/AdminCompatController.php` | `MobileApp` | 管理兼容配置读写。
+- 阶段 TASK-020 | `plugins/MobileApp/Http/Middleware/MobileStartupGate.php` | `MobileApp` | 连接与购买熔断门。
+- 阶段 TASK-020 | `plugins/MobileApp/Support/MobileClientHints.php` | `MobileApp` | 客户端版本与区域提示。
+- 阶段 TASK-020 | `plugins/MobileApp/Models/CompatSetting.php` | `MobileApp` | 熔断配置存储。
+- 阶段 TASK-020 | `plugins/MobileApp/Models/CompatAudit.php` | `MobileApp` | 配置变更审计。
+- 阶段 TASK-020 | `plugins/MobileApp/database/migrations/2026_09_05_190000_create_mobile_app_compat_settings_table.php` | `MobileApp` | 兼容设置表。
+- 阶段 TASK-020 | `plugins/MobileApp/database/migrations/2026_09_05_190001_create_mobile_app_compat_audits_table.php` | `MobileApp` | 兼容审计表。
+- 阶段 TASK-020 | `plugins/MobileApp/docs/legal.json` | `MobileApp` | 法律文案。
+- 阶段 TASK-020 | `tests/task-020/**` | `MobileApp` | 隔离启动状态、内核粒度和批准规则测试。
+- 阶段 TASK-020 | `plugins/MobileApp/Providers/PluginServiceProvider.php` | `MobileApp` | 增加 MobileApiException 渲染为移动信封，避免官方 Handler 吞掉机器码。
+

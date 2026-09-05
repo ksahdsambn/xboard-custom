@@ -1,18 +1,21 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Plugin\MobileApp\Controllers\AdminCompatController;
+use Plugin\MobileApp\Controllers\BootstrapController;
+use Plugin\MobileApp\Controllers\LegalController;
 use Plugin\MobileApp\Controllers\SkeletonController;
 
 $registerVersion = static function (string $version): void {
     $namePrefix = 'mobile.v' . $version . '.';
     $controller = SkeletonController::class;
 
-    Route::prefix('api/mobile/v' . $version)->group(function () use ($namePrefix, $controller): void {
-        Route::get('bootstrap', [$controller, 'notImplemented'])->name($namePrefix . 'bootstrap.get');
-        Route::get('legal/privacy', [$controller, 'notImplemented'])->name($namePrefix . 'legal.privacy.get');
-        Route::get('legal/terms', [$controller, 'notImplemented'])->name($namePrefix . 'legal.terms.get');
-        Route::get('legal/account-deletion', [$controller, 'notImplemented'])->name($namePrefix . 'legal.accountDeletion.get');
-        Route::get('legal/support', [$controller, 'notImplemented'])->name($namePrefix . 'legal.support.get');
+    Route::prefix('api/mobile/v' . $version)->middleware('mobile.envelope')->group(function () use ($namePrefix, $controller): void {
+        Route::get('bootstrap', [BootstrapController::class, 'show'])->name($namePrefix . 'bootstrap.get');
+        Route::get('legal/privacy', [LegalController::class, 'privacy'])->name($namePrefix . 'legal.privacy.get');
+        Route::get('legal/terms', [LegalController::class, 'terms'])->name($namePrefix . 'legal.terms.get');
+        Route::get('legal/account-deletion', [LegalController::class, 'accountDeletion'])->name($namePrefix . 'legal.accountDeletion.get');
+        Route::get('legal/support', [LegalController::class, 'support'])->name($namePrefix . 'legal.support.get');
         Route::post('auth/register', [$controller, 'notImplemented'])->name($namePrefix . 'auth.register');
         Route::post('auth/login', [$controller, 'notImplemented'])->name($namePrefix . 'auth.login');
         Route::post('auth/email-code', [$controller, 'notImplemented'])->name($namePrefix . 'auth.emailCode');
@@ -25,7 +28,9 @@ $registerVersion = static function (string $version): void {
             Route::get('entitlement', [$controller, 'notImplemented'])->name($namePrefix . 'entitlement.get');
             Route::get('plans', [$controller, 'notImplemented'])->name($namePrefix . 'plans.list');
             Route::get('nodes', [$controller, 'notImplemented'])->name($namePrefix . 'nodes.list');
-            Route::get('profiles/{opaqueProfileId}', [$controller, 'notImplemented'])->name($namePrefix . 'profiles.get');
+            Route::middleware('mobile.startup:connect')->group(function () use ($namePrefix, $controller): void {
+                Route::get('profiles/{opaqueProfileId}', [$controller, 'notImplemented'])->name($namePrefix . 'profiles.get');
+            });
             Route::get('notices', [$controller, 'notImplemented'])->name($namePrefix . 'notices.list');
             Route::get('notices/{noticeId}', [$controller, 'notImplemented'])->name($namePrefix . 'notices.get');
             Route::post('notices/{noticeId}/read', [$controller, 'notImplemented'])->name($namePrefix . 'notices.read');
@@ -35,8 +40,10 @@ $registerVersion = static function (string $version): void {
             Route::post('tickets/{ticketId}/replies', [$controller, 'notImplemented'])->name($namePrefix . 'tickets.reply');
             Route::post('tickets/{ticketId}/close', [$controller, 'notImplemented'])->name($namePrefix . 'tickets.close');
             Route::put('devices', [$controller, 'notImplemented'])->name($namePrefix . 'devices.register');
-            Route::post('play/purchases', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.submit');
-            Route::post('play/purchases/restore', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.restore');
+            Route::middleware('mobile.startup:purchase')->group(function () use ($namePrefix, $controller): void {
+                Route::post('play/purchases', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.submit');
+                Route::post('play/purchases/restore', [$controller, 'notImplemented'])->name($namePrefix . 'play.purchase.restore');
+            });
             Route::post('account/deletion/preview', [$controller, 'notImplemented'])->name($namePrefix . 'account.deletion.preview');
             Route::post('account/deletion', [$controller, 'notImplemented'])->name($namePrefix . 'account.deletion.submit');
             Route::get('account/deletion', [$controller, 'notImplemented'])->name($namePrefix . 'account.deletion.get');
@@ -45,8 +52,8 @@ $registerVersion = static function (string $version): void {
         Route::middleware(['admin', 'log'])->prefix('admin')->group(function () use ($namePrefix, $controller): void {
             Route::get('play-products', [$controller, 'notImplemented'])->name($namePrefix . 'admin.playProducts.list');
             Route::put('play-products', [$controller, 'notImplemented'])->name($namePrefix . 'admin.playProducts.upsert');
-            Route::get('compat', [$controller, 'notImplemented'])->name($namePrefix . 'admin.compat.get');
-            Route::put('compat', [$controller, 'notImplemented'])->name($namePrefix . 'admin.compat.update');
+            Route::get('compat', [AdminCompatController::class, 'show'])->name($namePrefix . 'admin.compat.get');
+            Route::put('compat', [AdminCompatController::class, 'update'])->name($namePrefix . 'admin.compat.update');
         });
 
         Route::post('platform/google/rtdn', [$controller, 'notImplemented'])
